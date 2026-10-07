@@ -19,15 +19,9 @@ class TerminalZugang
     {
         abort_unless(Module::where('key', 'zeiterfassung')->where('is_enabled', true)->exists(), 404);
 
+        // Falscher Schlüssel oder fremdes Netz: schlichtes 403 ohne Erklärung.
         $terminal = Terminal::zumToken((string) $request->route('schluessel'));
-        if (! $terminal) {
-            return response()->view('zeiterfassung::terminal.gesperrt', ['grund' => 'Dieses Terminal ist nicht (mehr) eingerichtet.'], 403);
-        }
-        if (! $terminal->erlaubtIp($request->ip())) {
-            return response()->view('zeiterfassung::terminal.gesperrt', [
-                'grund' => 'Dieses Terminal ist von hier aus nicht freigegeben (Adresse '.$request->ip().').',
-            ], 403);
-        }
+        abort_unless($terminal && $terminal->erlaubtIp($request->ip()), 403);
 
         if (! $terminal->zuletzt_am || $terminal->zuletzt_am->lt(now()->subMinute())) {
             $terminal->forceFill(['zuletzt_am' => now()])->saveQuietly();
