@@ -39,8 +39,11 @@ class ZeiterfassungServiceProvider extends ModuleServiceProvider
             ->rolle(Rechte::HOMEOFFICE, 'Zeiterfassung: Stempeln im Intranet (Homeoffice)')
             ->rolle(Rechte::NACHTRAG, 'Zeiterfassung: Nachträge mit Freigabe')
             ->rolle(Rechte::NACHTRAG_FREI, 'Zeiterfassung: Nachträge ohne Freigabe')
+            ->rolle(Rechte::DIENSTPLAN, 'Zeiterfassung: Dienstpläne erstellen (alle Abteilungen)')
             ->item('meine', 'Meine Zeiten', 'module.zeiterfassung.meine.index', icon: 'history')
             ->item('abwesenheiten', 'Urlaub & Abwesenheit', 'module.zeiterfassung.abwesenheiten.index', icon: 'calendar')
+            ->item('dienstplan', 'Dienstplan', 'module.zeiterfassung.dienstplan.index', icon: 'grid',
+                visibleWhen: fn () => Rechte::darfDienstplan(auth()->user()))
             ->item('team', 'Team', 'module.zeiterfassung.team.index', icon: 'users',
                 visibleWhen: fn () => Rechte::darfTeam(auth()->user()))
             ->item('freigaben', 'Freigaben', 'module.zeiterfassung.freigaben.index', icon: 'list',
@@ -56,6 +59,11 @@ class ZeiterfassungServiceProvider extends ModuleServiceProvider
                 'team.abwesenheit', 'team.abwesenheit.stornieren', 'team.chip', 'team.code', 'team.ausweis.entfernen',
                 'team.verstoesse',
                 'freigaben.buchung', 'freigaben.abwesenheit',
+                // Dienstplan: Planen prüft Rechte::darfPlanen, Ansehen die Abteilungszugehörigkeit.
+                'dienstplan.zeigen', 'dienstplan.druck', 'dienstplan.vorschlagen', 'dienstplan.schicht', 'dienstplan.status',
+                'dienstplan.abteilung', 'dienstplan.abteilung.anlegen', 'dienstplan.abteilung.speichern',
+                'dienstplan.abteilung.besetzung', 'dienstplan.abteilung.personen', 'dienstplan.abteilung.sondertag',
+                'dienstplan.abteilung.sondertag.entfernen', 'dienstplan.abteilung.entfernen',
             )
             ->stufe(Zugriffsstufe::Verwalten,
                 'einstellungen.regeln', 'einstellungen.gruppe.anlegen', 'einstellungen.gruppe.leitung',
@@ -88,6 +96,7 @@ class ZeiterfassungServiceProvider extends ModuleServiceProvider
                 'zeiterfassung.ausweis' => 'Zeiterfassung: Chip/Code geändert',
                 'zeiterfassung.abwesenheit' => 'Zeiterfassung: Abwesenheit eingetragen',
                 'zeiterfassung.einstellungen' => 'Zeiterfassung: Einstellungen geändert',
+                'zeiterfassung.dienstplan' => 'Zeiterfassung: Dienstplan geändert',
             ]);
         }
     }

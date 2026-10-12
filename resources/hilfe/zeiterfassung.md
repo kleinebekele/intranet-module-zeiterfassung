@@ -33,6 +33,11 @@ Rechten gilt das sofort oder geht als Antrag an deine Leitung. Ohne Nachtragsrec
 
 Unter „Urlaub & Abwesenheit" beantragst du Urlaub; die Leitung genehmigt ihn. Krankmeldungen gelten sofort.
 
+## Dienstplan
+
+Unter „Dienstplan" siehst du die veröffentlichten Pläne deiner Abteilungen und deine nächsten Schichten.
+Die Zeiten sind Anwesenheit inklusive Pause.
+
 ## Für die Leitung
 rollen: zeit-verwaltung
 
@@ -40,6 +45,9 @@ rollen: zeit-verwaltung
   korrigieren, Sollzeit und Urlaubsanspruch festlegen, Chip oder Code zuordnen, Abwesenheiten eintragen.
 - **Freigaben**: Nachträge und Urlaubsanträge annehmen oder ablehnen. Eigene Anträge gibt immer jemand anderes frei.
 - **Auswertung & Export**: Monatsübersicht, CSV für Personio, Stundenzettel zum Drucken.
+- **Dienstplan**: Abteilung anlegen, unter „einrichten" Besetzung (wann mindestens / optional wie viele), Personen und
+  Sondertage eintragen. „Vorschlag erstellen" plant den Monat; Zellen anklicken zum Ändern, Hinweise beachten,
+  dann veröffentlichen.
 - **Einstellungen**: welche Rollen teilnehmen (Gruppen) und wer sie leitet, Terminals, Regeln.
 
 Jede Änderung bleibt nachvollziehbar: Die alte Buchung wird nicht überschrieben, sondern als „ersetzt" aufbewahrt.

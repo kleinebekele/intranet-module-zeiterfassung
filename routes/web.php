@@ -1,8 +1,10 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Intranet\Modules\Zeiterfassung\Http\Controllers\AbteilungController;
 use Intranet\Modules\Zeiterfassung\Http\Controllers\AbwesenheitController;
 use Intranet\Modules\Zeiterfassung\Http\Controllers\AuswertungController;
+use Intranet\Modules\Zeiterfassung\Http\Controllers\DienstplanController;
 use Intranet\Modules\Zeiterfassung\Http\Controllers\EinstellungenController;
 use Intranet\Modules\Zeiterfassung\Http\Controllers\FreigabeController;
 use Intranet\Modules\Zeiterfassung\Http\Controllers\MeineZeitenController;
@@ -51,6 +53,22 @@ Route::middleware(['web', 'auth'])
         Route::get('auswertung', [AuswertungController::class, 'index'])->name('auswertung.index');
         Route::get('auswertung/csv', [AuswertungController::class, 'csv'])->name('auswertung.csv');
         Route::get('auswertung/stundenzettel', [AuswertungController::class, 'stundenzettel'])->name('auswertung.stundenzettel');
+
+        // Dienstplan: Abteilungen mit Besetzung und Personen, Monatspläne.
+        Route::get('dienstplan', [DienstplanController::class, 'index'])->name('dienstplan.index');
+        Route::post('dienstplan/abteilungen', [AbteilungController::class, 'anlegen'])->name('dienstplan.abteilung.anlegen');
+        Route::get('dienstplan/{abteilung}', [DienstplanController::class, 'zeigen'])->name('dienstplan.zeigen');
+        Route::get('dienstplan/{abteilung}/druck', [DienstplanController::class, 'druck'])->name('dienstplan.druck');
+        Route::post('dienstplan/{abteilung}/vorschlagen', [DienstplanController::class, 'vorschlagen'])->name('dienstplan.vorschlagen');
+        Route::post('dienstplan/{abteilung}/schicht', [DienstplanController::class, 'schicht'])->name('dienstplan.schicht');
+        Route::post('dienstplan/{abteilung}/status', [DienstplanController::class, 'status'])->name('dienstplan.status');
+        Route::get('dienstplan/{abteilung}/abteilung', [AbteilungController::class, 'bearbeiten'])->name('dienstplan.abteilung');
+        Route::post('dienstplan/{abteilung}/abteilung', [AbteilungController::class, 'speichern'])->name('dienstplan.abteilung.speichern');
+        Route::post('dienstplan/{abteilung}/besetzung', [AbteilungController::class, 'besetzung'])->name('dienstplan.abteilung.besetzung');
+        Route::post('dienstplan/{abteilung}/personen', [AbteilungController::class, 'personen'])->name('dienstplan.abteilung.personen');
+        Route::post('dienstplan/{abteilung}/sondertage', [AbteilungController::class, 'sondertag'])->name('dienstplan.abteilung.sondertag');
+        Route::post('dienstplan/{abteilung}/sondertage/{sondertag}/entfernen', [AbteilungController::class, 'sondertagEntfernen'])->name('dienstplan.abteilung.sondertag.entfernen');
+        Route::post('dienstplan/{abteilung}/entfernen', [AbteilungController::class, 'entfernen'])->name('dienstplan.abteilung.entfernen');
 
         Route::get('einstellungen', [EinstellungenController::class, 'index'])->name('einstellungen.index');
         Route::post('einstellungen/regeln', [EinstellungenController::class, 'regeln'])->name('einstellungen.regeln');

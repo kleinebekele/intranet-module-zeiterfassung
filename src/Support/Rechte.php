@@ -29,6 +29,8 @@ class Rechte
 
     public const HOMEOFFICE = 'zeit-homeoffice';
 
+    public const DIENSTPLAN = 'zeit-dienstplan';
+
     /** @var array<string, mixed> Zwischenspeicher je Anfrage */
     private static array $merker = [];
 
@@ -134,5 +136,23 @@ class Rechte
     public static function darfTeam(?User $user): bool
     {
         return $user !== null && (self::istVerwaltung($user) || self::istLeitung($user));
+    }
+
+    /** Abteilungen einrichten und Dienstpläne erstellen: Verwaltung oder Rolle zeit-dienstplan. */
+    public static function darfPlanen(?User $user): bool
+    {
+        return $user !== null && (self::istVerwaltung($user) || $user->hatRolle(self::DIENSTPLAN));
+    }
+
+    /** @return Collection<int, int> Abteilungen, in denen der Benutzer eingeplant wird */
+    public static function abteilungenVon(User $user): Collection
+    {
+        return self::$merker['abteilungen.'.$user->id] ??= DB::table('zeit_abteilung_personen')
+            ->where('user_id', $user->id)->pluck('abteilung_id')->map(fn ($id) => (int) $id);
+    }
+
+    public static function darfDienstplan(?User $user): bool
+    {
+        return $user !== null && (self::darfPlanen($user) || self::abteilungenVon($user)->isNotEmpty());
     }
 }

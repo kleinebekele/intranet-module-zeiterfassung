@@ -13,6 +13,9 @@ Modul für die modulare Intranet-Plattform ([intranet-core](https://github.com/k
   48-Stunden-Woche. Warnungen live (Glocke, Terminal) und nachts per Ekkon-Aufgabe
   `Zeiterfassung/Tagesabschluss`; fehlende Pause wird auf Wunsch abgezogen.
 - **Feiertage** aller Bundesländer, selbst berechnet.
+- **Dienstplan**: Abteilungen mit Besetzung je Wochentag (mindestens / optional zusätzlich), Personen (Stammkraft
+  oder Aushilfe mit Monatsbudget, Wochenstunden, feste freie Tage) und Sondertagen. Daraus ein Monatsvorschlag, der
+  Feiertage, Abwesenheiten und das Arbeitszeitgesetz beachtet; danach von Hand anpassen, prüfen, veröffentlichen, drucken.
 - **Export**: CSV für den Anwesenheiten-Import von Personio, Tagessummen, Abwesenheiten; Stundenzettel zum Drucken.
 
 ## Rechte
@@ -26,12 +29,27 @@ Den Seitenzugang regelt der Core (Menüpunkt ↔ Rolle). Darüber hinaus:
 | `zeit-verwaltung` | alle Teilnehmer, Einstellungen, eigene Nachträge sofort gültig |
 | `zeit-homeoffice` | Stempeln im Intranet |
 | `zeit-nachtrag-frei` / `zeit-nachtrag` | eigene Nachträge sofort bzw. mit Freigabe |
+| `zeit-dienstplan` | Abteilungen einrichten, Dienstpläne aller Abteilungen erstellen (Verwaltung darf das auch) |
+| Person einer Abteilung | sieht deren veröffentlichte Dienstpläne |
 
 ## Terminal
 
 Unter Einstellungen → Terminals anlegen; die angezeigte Adresse enthält den geheimen Schlüssel des Terminals und
 wird am Tablet als Startseite geöffnet. Optional auf Netze beschränkbar. Chips, die im Kantinen-Modul
 zugeordnet sind, gelten mit.
+
+## Dienstplan-Vorschlag
+
+1. **Arbeitstage** der Stammkräfte: so viele, wie das Monatssoll hergibt (Zeitmodell bzw. Wochenstunden; Feiertage und
+   Abwesenheiten zählen nicht), höchstens die Tage je Woche – jeweils dort, wo noch am meisten Bedarf offen ist.
+   So liegen freie Tage versetzt; Samstage rotieren.
+2. **Uhrzeiten**: jede Stammkraft bekommt ihre Tageslänge dort, wo sie die meisten offenen Viertelstunden abdeckt
+   (früh/spät im Wechsel).
+3. **Lücken**: erst die Mindestbesetzung mit Aushilfen (im Budget), notfalls mit freien Stammkräften (Überstunden);
+   danach die optionale Besetzung nur noch mit Aushilfen-Budget.
+
+Dabei gelten Ruhezeit, Tageshöchstzeit und Pausen aus den Einstellungen, höchstens sechs Tage am Stück. Beantragter
+Urlaub blockiert wie genehmigter. Jede Änderung von Hand wird sofort neu geprüft (Unterbesetzung, Soll, Ruhezeit …).
 
 ## Aufbewahrung
 
