@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Intranet\Modules\Zeiterfassung\Models\Abwesenheit;
+use Intranet\Modules\Zeiterfassung\Support\Csv;
 use Intranet\Modules\Zeiterfassung\Support\Format;
 use Intranet\Modules\Zeiterfassung\Support\Rechner;
 use Intranet\Modules\Zeiterfassung\Support\Rechte;
@@ -56,11 +57,11 @@ class AuswertungController
             $bis = $monat->copy()->endOfMonth();
 
             if ($art === 'abwesenheiten') {
-                fputcsv($out, ['E-Mail', 'Name', 'Art', 'Von', 'Bis', 'Halber Tag', 'Notiz'], ';');
+                Csv::zeile($out, ['E-Mail', 'Name', 'Art', 'Von', 'Bis', 'Halber Tag', 'Notiz'], ';');
                 $liste = Abwesenheit::with('user')->genehmigt()->whereIn('user_id', $personen->pluck('id'))
                     ->ueberschneidet($monat, $bis)->orderBy('von')->get();
                 foreach ($liste as $a) {
-                    fputcsv($out, [$a->user->email, $a->user->name, $a->artText(), $a->von->format('Y-m-d'),
+                    Csv::zeile($out, [$a->user->email, $a->user->name, $a->artText(), $a->von->format('Y-m-d'),
                         $a->bis->format('Y-m-d'), $a->halbtag ? 'ja' : 'nein', $a->notiz], ';');
                 }
                 fclose($out);
@@ -68,7 +69,7 @@ class AuswertungController
                 return;
             }
 
-            fputcsv($out, $art === 'personio'
+            Csv::zeile($out, $art === 'personio'
                 ? ['E-Mail', 'Datum', 'Beginn', 'Ende', 'Art', 'Kommentar']
                 : ['E-Mail', 'Name', 'Datum', 'Beginn', 'Ende', 'Pause (Min.)', 'Abzug Pause (Min.)', 'Ist', 'Soll', 'Saldo', 'Abwesenheit', 'Feiertag', 'Hinweise'], ';');
 
@@ -78,7 +79,7 @@ class AuswertungController
                         if ($t->istArbeitsfrei() && ! $t->feiertag) {
                             continue;
                         }
-                        fputcsv($out, [$p->email, $p->name, $t->datum->format('Y-m-d'), $t->beginn()?->format('H:i'),
+                        Csv::zeile($out, [$p->email, $p->name, $t->datum->format('Y-m-d'), $t->beginn()?->format('H:i'),
                             $t->ende()?->format('H:i'), array_sum(array_column($t->pausen, 'minuten')), $t->abzug,
                             Format::dauer($t->ist()), Format::dauer($t->soll), Format::dauer($t->saldo()),
                             $t->abwesenheit?->artText(), $t->feiertag, implode(' | ', $t->warnungen)], ';');
@@ -94,9 +95,9 @@ class AuswertungController
                             continue;
                         }
                         if ($vorher && $b->beginn->gt($vorher->ende)) {
-                            fputcsv($out, [$p->email, $t->datum->format('Y-m-d'), $vorher->ende->format('H:i'), $b->beginn->format('H:i'), 'Pause', ''], ';');
+                            Csv::zeile($out, [$p->email, $t->datum->format('Y-m-d'), $vorher->ende->format('H:i'), $b->beginn->format('H:i'), 'Pause', ''], ';');
                         }
-                        fputcsv($out, [$p->email, $t->datum->format('Y-m-d'), $b->beginn->format('H:i'), $b->ende->format('H:i'), 'Arbeit', $kommentar], ';');
+                        Csv::zeile($out, [$p->email, $t->datum->format('Y-m-d'), $b->beginn->format('H:i'), $b->ende->format('H:i'), 'Arbeit', $kommentar], ';');
                         $kommentar = '';
                         $vorher = $b;
                     }

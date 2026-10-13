@@ -87,6 +87,7 @@ Route::middleware(['web', TerminalZugang::class])
     ->name('zeiterfassung.terminal.')
     ->group(function () {
         Route::get('/', [TerminalController::class, 'index'])->name('index');
+        // Drossel je IP; falsche Codes sperren zusätzlich je Terminal (TerminalController::fehlversuch).
         Route::post('erkennen', [TerminalController::class, 'erkennen'])->middleware('throttle:30,1')->name('erkennen');
         Route::post('buchen', [TerminalController::class, 'buchen'])->middleware('throttle:60,1')->name('buchen');
     });

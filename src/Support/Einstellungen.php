@@ -21,9 +21,19 @@ class Einstellungen
         'sonntag_warnen' => '1',   // § 9 ArbZG: Sonn- und Feiertagsruhe
     ];
 
+    /** Neue Codes haben mindestens so viele Ziffern; ältere, kürzere Codes bleiben gültig. */
+    public const CODE_MIN = 6;
+
     public static function get(string $schluessel): string
     {
-        return (string) Setting::get('zeiterfassung.'.$schluessel, self::VORGABEN[$schluessel] ?? '');
+        $wert = (string) Setting::get('zeiterfassung.'.$schluessel, self::VORGABEN[$schluessel] ?? '');
+
+        // Eine früher gespeicherte kürzere Länge gilt als Mindestlänge.
+        if ($schluessel === 'code_laenge') {
+            return (string) max(self::CODE_MIN, min(10, (int) $wert));
+        }
+
+        return $wert;
     }
 
     public static function int(string $schluessel): int

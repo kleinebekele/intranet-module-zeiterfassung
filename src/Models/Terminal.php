@@ -8,8 +8,8 @@ use Symfony\Component\HttpFoundation\IpUtils;
 
 /**
  * Ein Stempel-Terminal (Tablet im Kiosk-Modus). Es meldet sich über ein
- * geheimes Kürzel in der Adresse an; gespeichert ist nur dessen Hash. Optional
- * zusätzlich auf Netze beschränkt.
+ * geheimes Kürzel in der Adresse an; gespeichert ist nur dessen Hash. Zusätzlich
+ * muss die Anfrage aus einem eingetragenen Netz kommen – ohne Netz gesperrt.
  */
 class Terminal extends Model
 {
@@ -48,10 +48,16 @@ class Terminal extends Model
         return array_values(array_unique(preg_split('/[\s,;]+/', (string) $text, -1, PREG_SPLIT_NO_EMPTY) ?: []));
     }
 
+    /** Ohne eingetragenes Netz ist das Terminal gesperrt (das Intranet ist öffentlich erreichbar). */
+    public function hatNetze(): bool
+    {
+        return $this->netzListe() !== [];
+    }
+
     public function erlaubtIp(?string $ip): bool
     {
         $netze = $this->netzListe();
 
-        return $netze === [] || ($ip !== null && IpUtils::checkIp($ip, $netze));
+        return $netze !== [] && $ip !== null && IpUtils::checkIp($ip, $netze);
     }
 }

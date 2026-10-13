@@ -255,13 +255,10 @@ class TeamController
     public function code(Request $request, User $person)
     {
         $this->darf($request, $person);
-        $wunsch = trim((string) $request->input('code', ''));
-        if ($wunsch !== '' && ! preg_match('/^\d{4,10}$/', $wunsch)) {
-            return back()->with('error', 'Ein Code besteht aus 4 bis 10 Ziffern.');
-        }
 
+        // Nur zufällige Codes – ein Wunsch-Code ließe sich als Probe nutzen, ob ein Code vergeben ist.
         try {
-            $code = Ausweis::neuerCode($person, Einstellungen::int('code_laenge'), $wunsch !== '' ? $wunsch : null);
+            $code = Ausweis::neuerCode($person, Einstellungen::int('code_laenge'));
         } catch (RuntimeException $e) {
             return back()->with('error', $e->getMessage());
         }

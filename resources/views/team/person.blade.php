@@ -196,11 +196,11 @@
                         <button type="submit" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">Chip zuordnen</button>
                     </form>
 
-                    <form method="POST" action="{{ route('module.zeiterfassung.team.code', $person) }}" class="mt-3 flex flex-wrap gap-2">
+                    <form method="POST" action="{{ route('module.zeiterfassung.team.code', $person) }}" class="mt-3 flex flex-wrap items-center gap-2"
+                          data-bestaetigen="Neuen zufälligen Code erzeugen? Ein bisheriger Code gilt dann nicht mehr." data-knopf="Code erzeugen">
                         @csrf
-                        <input type="text" name="code" inputmode="numeric" pattern="\d{4,10}" placeholder="Wunsch-Code (leer = zufällig)"
-                               class="min-w-48 flex-1 rounded-lg border-gray-300 font-mono text-sm">
-                        <button type="submit" class="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Code neu setzen</button>
+                        <span class="flex-1 text-xs text-gray-500">Der Code wird zufällig erzeugt und nur einmal angezeigt.</span>
+                        <button type="submit" class="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Zufälligen Code erzeugen</button>
                     </form>
                 </div>
 

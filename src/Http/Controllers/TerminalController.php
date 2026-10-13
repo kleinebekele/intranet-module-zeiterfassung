@@ -5,6 +5,7 @@ namespace Intranet\Modules\Zeiterfassung\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Intranet\Modules\Zeiterfassung\Models\Ausweis;
 use Intranet\Modules\Zeiterfassung\Models\Terminal;
 use Intranet\Modules\Zeiterfassung\Support\Einstellungen;
@@ -24,6 +25,16 @@ class TerminalController
 
     private const SITZUNG = 60;
 
+    private const CODE_FEHLER = 'zeit-terminal-code-fehler:';
+
+    private const CODE_SPERRE = 'zeit-terminal-code-sperre:';
+
+    private const FEHLVERSUCHE = 10;
+
+    private const FENSTER = 300;
+
+    private const SPERRZEIT = 300;
+
     public function index(Request $request)
     {
         $terminal = $this->terminal($request);
@@ -42,19 +53,37 @@ class TerminalController
         $data = $request->validate(['eingabe' => ['required', 'string', 'max:100']]);
         $request->session()->forget(self::SESSION);
 
-        $person = Ausweis::personFuer($data['eingabe']);
-        $istCode = (bool) preg_match('/^\d{4,10}$/', trim($data['eingabe']));
+        $terminal = $this->terminal($request);
+        $istCode = Ausweis::istCode($data['eingabe']);
+        $sperre = self::CODE_SPERRE.$terminal->id;
+
+        // Code-Eingang dieses Terminals gesperrt: Chips (auch rein numerische) gehen weiter.
+        $gesperrt = $istCode && RateLimiter::tooManyAttempts($sperre, 1);
+        $person = Ausweis::personFuer($data['eingabe'], codes: ! $gesperrt);
+        $freigeschaltet = $person && Rechte::istTeilnehmer($person) && ! (method_exists($person, 'istGesperrt') && $person->istGesperrt());
+
+        if ($istCode && ! $freigeschaltet) {
+            if ($gesperrt) {
+                return response()->json(['found' => false, 'meldung' => $this->sperrText($sperre)]);
+            }
+            // Ein fremder Code und ein Code ohne Teilnahme sehen von außen gleich aus.
+            if ($this->fehlversuch($terminal)) {
+                return response()->json(['found' => false, 'meldung' => $this->sperrText($sperre)]);
+            }
+
+            return response()->json(['found' => false, 'meldung' => 'Code nicht erkannt.']);
+        }
 
         if (! $person) {
             return response()->json([
                 'found' => false,
-                'meldung' => $istCode ? 'Code unbekannt.' : 'Chip unbekannt.',
+                'meldung' => 'Chip unbekannt.',
                 // Hilft beim Einrichten: die Kennung lässt sich unter Team → Person eintragen.
-                'kennung' => $istCode ? null : Ausweis::chipNormal($data['eingabe']),
+                'kennung' => Ausweis::chipNormal($data['eingabe']),
             ]);
         }
 
-        if (! Rechte::istTeilnehmer($person) || (method_exists($person, 'istGesperrt') && $person->istGesperrt())) {
+        if (! $freigeschaltet) {
             return response()->json(['found' => false, 'meldung' => 'Für die Zeiterfassung nicht freigeschaltet.']);
         }
 
@@ -107,6 +136,34 @@ class TerminalController
                 ? 'Seit '.Format::dauer($s['block']).' Std. ohne Pause – bitte Pause machen.'
                 : null,
         ];
+    }
+
+    /**
+     * Falscher Code an diesem Terminal. Nach FEHLVERSUCHE Fehlern innerhalb von
+     * FENSTER Sekunden wird der Code-Eingang SPERRZEIT Sekunden gesperrt –
+     * zusätzlich zur Drossel je IP, damit wechselnde Adressen nichts nützen.
+     *
+     * @return bool ob der Code-Eingang jetzt gesperrt ist
+     */
+    private function fehlversuch(Terminal $terminal): bool
+    {
+        $zaehler = self::CODE_FEHLER.$terminal->id;
+        RateLimiter::hit($zaehler, self::FENSTER);
+        if (RateLimiter::attempts($zaehler) < self::FEHLVERSUCHE) {
+            return false;
+        }
+
+        RateLimiter::clear($zaehler);
+        RateLimiter::hit(self::CODE_SPERRE.$terminal->id, self::SPERRZEIT);
+
+        return true;
+    }
+
+    private function sperrText(string $sperre): string
+    {
+        $minuten = max(1, (int) ceil(RateLimiter::availableIn($sperre) / 60));
+
+        return "Zu viele falsche Codes – Code-Eingabe für {$minuten} Min. gesperrt. Chip auflegen geht weiter.";
     }
 
     private function terminal(Request $request): Terminal

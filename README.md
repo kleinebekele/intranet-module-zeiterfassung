@@ -35,8 +35,11 @@ Den Seitenzugang regelt der Core (Menüpunkt ↔ Rolle). Darüber hinaus:
 ## Terminal
 
 Unter Einstellungen → Terminals anlegen; die angezeigte Adresse enthält den geheimen Schlüssel des Terminals und
-wird am Tablet als Startseite geöffnet. Optional auf Netze beschränkbar. Chips, die im Kantinen-Modul
-zugeordnet sind, gelten mit.
+wird am Tablet als Startseite geöffnet. Zusätzlich muss mindestens ein Netz eingetragen sein, aus dem das Terminal
+kommt – ohne Netz ist es gesperrt. Chips, die im Kantinen-Modul zugeordnet sind, gelten mit.
+
+Persönliche Codes werden immer zufällig erzeugt (mindestens 6 Ziffern; ältere kürzere Codes bleiben gültig). Nach
+10 falschen Codes in 5 Minuten sperrt ein Terminal die Code-Eingabe für 5 Minuten; Chips funktionieren weiter.
 
 ## Dienstplan-Vorschlag
 

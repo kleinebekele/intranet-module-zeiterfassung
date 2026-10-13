@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Intranet\Modules\Zeiterfassung\Support\Einstellungen;
 
 /**
  * Womit sich jemand am Terminal meldet: Chip-Kennung oder persönlicher Code.
@@ -35,6 +36,12 @@ class Ausweis extends Model
         return preg_replace('/[^a-z0-9]/', '', mb_strtolower(trim((string) $roh)));
     }
 
+    /** Nur Ziffern = Code (ältere Codes können 4 oder 5 Ziffern haben). */
+    public static function istCode(string $eingabe): bool
+    {
+        return (bool) preg_match('/^\d{4,10}$/', trim($eingabe));
+    }
+
     public static function codeHash(string $code): string
     {
         return hash_hmac('sha256', 'zeit-code:'.trim($code), (string) config('app.key'));
@@ -42,16 +49,17 @@ class Ausweis extends Model
 
     /**
      * Wer steckt hinter der Eingabe am Terminal? Ziffern = Code, sonst Chip.
-     * Chips, die in der Kantine schon zugeordnet sind, gelten mit.
+     * Chips, die in der Kantine schon zugeordnet sind, gelten mit. Mit
+     * $codes = false (Code-Eingang gesperrt) werden nur Chips gesucht.
      */
-    public static function personFuer(string $eingabe): ?User
+    public static function personFuer(string $eingabe, bool $codes = true): ?User
     {
         $eingabe = trim($eingabe);
         if ($eingabe === '') {
             return null;
         }
 
-        if (preg_match('/^\d{4,10}$/', $eingabe)) {
+        if ($codes && self::istCode($eingabe)) {
             $treffer = self::where('art', self::CODE)->where('wert', self::codeHash($eingabe))->first();
             if ($treffer) {
                 return $treffer->user;
@@ -73,13 +81,16 @@ class Ausweis extends Model
     /**
      * Neuer zufälliger Terminal-Code für die Person; ein alter verfällt. Der
      * Klartext wird nur zurückgegeben, gespeichert ist allein der Hash.
+     *
+     * Frei gewählte Codes gibt es bewusst nicht: Eine Meldung „nicht verfügbar"
+     * würde verraten, dass jemand anderes genau diesen Code hat.
      */
-    public static function neuerCode(User $user, int $laenge, ?string $wunsch = null): string
+    public static function neuerCode(User $user, int $laenge): string
     {
-        $laenge = max(4, min(10, $laenge));
+        $laenge = max(Einstellungen::CODE_MIN, min(10, $laenge));
 
         for ($versuch = 0; $versuch < 50; $versuch++) {
-            $code = $wunsch ?? str_pad((string) random_int(0, 10 ** $laenge - 1), $laenge, '0', STR_PAD_LEFT);
+            $code = str_pad((string) random_int(0, 10 ** $laenge - 1), $laenge, '0', STR_PAD_LEFT);
             $hash = self::codeHash($code);
             $belegt = self::where('art', self::CODE)->where('wert', $hash)->where('user_id', '!=', $user->id)->exists();
             if (! $belegt) {
@@ -87,9 +98,6 @@ class Ausweis extends Model
                 self::create(['user_id' => $user->id, 'art' => self::CODE, 'wert' => $hash, 'bezeichnung' => 'Terminal-Code']);
 
                 return $code;
-            }
-            if ($wunsch !== null) {
-                throw new \RuntimeException('Dieser Code ist nicht verfügbar – bitte einen anderen wählen.');
             }
         }
 

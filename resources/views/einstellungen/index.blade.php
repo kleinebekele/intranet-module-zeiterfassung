@@ -43,7 +43,7 @@
                         <div class="flex flex-col gap-2">
                             <button type="submit" class="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700">Leitung speichern</button>
                             <button type="submit" formaction="{{ route('module.zeiterfassung.einstellungen.gruppe.entfernen', $g) }}"
-                                    onclick="return confirm('Gruppe {{ $g->name() }} aus der Zeiterfassung entfernen? Erfasste Zeiten bleiben erhalten.')"
+                                    data-bestaetigen="Gruppe „{{ $g->name() }}“ aus der Zeiterfassung entfernen? Erfasste Zeiten bleiben erhalten." data-knopf="Entfernen"
                                     class="rounded-lg px-3 py-1.5 text-sm text-red-600 hover:bg-red-50">Gruppe entfernen</button>
                         </div>
                     </form>
@@ -97,7 +97,7 @@
                 </label>
                 <label class="block text-sm">
                     <span class="text-gray-600">Länge zufälliger Terminal-Codes (Ziffern)</span>
-                    <input type="number" name="code_laenge" min="4" max="10" value="{{ $werte['code_laenge'] }}" class="mt-1 w-32 rounded-lg border-gray-300 text-sm">
+                    <input type="number" name="code_laenge" min="6" max="10" value="{{ $werte['code_laenge'] }}" class="mt-1 w-32 rounded-lg border-gray-300 text-sm">
                 </label>
                 <div class="flex justify-end">
                     <button type="submit" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">Regeln speichern</button>
@@ -123,13 +123,20 @@
                             </label>
                             <span class="text-xs text-gray-400">{{ $t->zuletzt_am ? 'zuletzt '.$t->zuletzt_am->diffForHumans() : 'noch nie benutzt' }}</span>
                         </div>
-                        <textarea name="netze" rows="2" placeholder="Nur aus diesen Netzen (leer = überall), z. B. 192.168.10.0/24"
-                                  class="w-full rounded-lg border-gray-300 font-mono text-xs">{{ $t->netze }}</textarea>
+                        @unless ($t->hatNetze())
+                            <div class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
+                                Gesperrt: Für dieses Terminal ist kein Netz eingetragen. Bitte das Netz des Standorts eintragen
+                                (z. B. 192.168.10.0/24 oder die feste Adresse des Tablets), sonst lässt es sich nicht benutzen.
+                            </div>
+                        @endunless
+                        <textarea name="netze" rows="2" placeholder="Nur aus diesen Netzen (Pflicht, sonst gesperrt), z. B. 192.168.10.0/24"
+                                  class="w-full rounded-lg font-mono text-xs {{ $t->hatNetze() ? 'border-gray-300' : 'border-red-400' }}">{{ $t->netze }}</textarea>
                         <div class="flex flex-wrap justify-end gap-2">
                             <button type="submit" formaction="{{ route('module.zeiterfassung.einstellungen.terminal.entfernen', $t) }}"
-                                    onclick="return confirm('Terminal {{ $t->name }} entfernen?')" class="rounded-lg px-3 py-1.5 text-xs text-red-600 hover:bg-red-50">Entfernen</button>
+                                    data-bestaetigen="Terminal „{{ $t->name }}“ entfernen?" data-knopf="Entfernen"
+                                    class="rounded-lg px-3 py-1.5 text-xs text-red-600 hover:bg-red-50">Entfernen</button>
                             <button type="submit" formaction="{{ route('module.zeiterfassung.einstellungen.terminal.schluessel', $t) }}"
-                                    onclick="return confirm('Neuer Schlüssel: Die bisherige Adresse funktioniert dann nicht mehr. Fortfahren?')"
+                                    data-bestaetigen="Neuer Schlüssel: Die bisherige Adresse funktioniert dann nicht mehr. Fortfahren?" data-knopf="Neuer Schlüssel"
                                     class="rounded-lg border border-gray-300 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50">Neuer Schlüssel</button>
                             <button type="submit" class="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700">Speichern</button>
                         </div>
@@ -139,7 +146,7 @@
             <form method="POST" action="{{ route('module.zeiterfassung.einstellungen.terminal.anlegen') }}" class="mt-3 space-y-2 border-t border-gray-100 pt-3">
                 @csrf
                 <input type="text" name="name" required placeholder="Name, z. B. Lehrerzimmer oder Filiale Nord" class="w-full rounded-lg border-gray-300 text-sm">
-                <textarea name="netze" rows="2" placeholder="Nur aus diesen Netzen (optional)" class="w-full rounded-lg border-gray-300 font-mono text-xs"></textarea>
+                <textarea name="netze" rows="2" placeholder="Nur aus diesen Netzen (Pflicht, sonst gesperrt), z. B. 192.168.10.0/24" class="w-full rounded-lg border-gray-300 font-mono text-xs"></textarea>
                 <div class="flex justify-end">
                     <button type="submit" class="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Terminal anlegen</button>
                 </div>

@@ -16,6 +16,7 @@ use Intranet\Modules\Zeiterfassung\Support\Rechte;
 /** Gruppen + Leitung, Terminals und die Regeln (Arbeitszeitgesetz, Bundesland). */
 class EinstellungenController
 {
+    private const OHNE_NETZ = 'Ohne eingetragenes Netz ist das Terminal gesperrt – bitte das Netz des Standorts eintragen.';
     public function index(Request $request)
     {
         $this->darf($request);
@@ -43,7 +44,7 @@ class EinstellungenController
             'max_block' => ['required', 'string'],
             'ruhezeit' => ['required', 'string'],
             'max_woche' => ['required', 'string'],
-            'code_laenge' => ['required', 'integer', 'min:4', 'max:10'],
+            'code_laenge' => ['required', 'integer', 'min:6', 'max:10'],
         ]);
 
         foreach (['max_tag', 'max_block', 'ruhezeit', 'max_woche'] as $k) {
@@ -101,9 +102,10 @@ class EinstellungenController
         }
 
         $token = Terminal::neuesToken();
-        Terminal::create($data + ['token_hash' => Terminal::hash($token), 'aktiv' => true]);
+        $terminal = Terminal::create($data + ['token_hash' => Terminal::hash($token), 'aktiv' => true]);
 
-        return back()->with('zeit_terminal_url', route('zeiterfassung.terminal.index', $token));
+        return back()->with('zeit_terminal_url', route('zeiterfassung.terminal.index', $token))
+            ->with($terminal->hatNetze() ? [] : ['error' => self::OHNE_NETZ]);
     }
 
     public function terminalSpeichern(Request $request, Terminal $terminal)
@@ -116,7 +118,9 @@ class EinstellungenController
 
         $terminal->update($data + ['aktiv' => $request->boolean('aktiv')]);
 
-        return back()->with('status', 'Terminal gespeichert.');
+        return $terminal->hatNetze()
+            ? back()->with('status', 'Terminal gespeichert.')
+            : back()->with('error', 'Terminal gespeichert. '.self::OHNE_NETZ);
     }
 
     /** Neuer Schlüssel: die alte Adresse funktioniert ab sofort nicht mehr. */
