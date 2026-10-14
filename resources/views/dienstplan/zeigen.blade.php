@@ -90,6 +90,8 @@
                 foreach (array_keys($personen) as $nr => $uid) {
                     $farbe[$uid] = $farben[$nr % count($farben)];
                 }
+                // 09:30 → 9:30 – spart Platz in den Tagesfeldern.
+                $zeit = fn (string $t) => preg_replace('/^0(\d)/', '$1', substr($t, 0, 5));
                 // Initialen: „Anna Berg" → AB, „Admin" → Ad. Wer gemeint ist, zeigt die Farbe (und der Mouseover).
                 $kurz = function (string $name): string {
                     $teile = preg_split('/\s+/', trim(preg_replace('/\(.*?\)/', '', $name))) ?: [$name];
@@ -122,7 +124,7 @@
 
             <div class="p-2 sm:p-4">
                 {{-- Wochentage (nur breite Bildschirme) --}}
-                <div class="hidden gap-1 pb-1 text-center text-xs font-semibold uppercase tracking-wide text-gray-500 xl:grid xl:grid-cols-[3.5rem_repeat(7,minmax(0,1fr))_10rem]">
+                <div class="hidden gap-1 pb-1 text-center text-xs font-semibold uppercase tracking-wide text-gray-500 min-[85rem]:grid min-[85rem]:grid-cols-[3rem_repeat(7,minmax(0,1fr))_8.5rem]">
                     <div>KW</div>
                     @foreach (\Intranet\Modules\Zeiterfassung\Models\Zeitmodell::TAGE as $name)
                         <div>{{ $name }}</div>
@@ -130,22 +132,22 @@
                     <div>Summe</div>
                 </div>
 
-                <div class="space-y-3 xl:space-y-1">
+                <div class="space-y-3 min-[85rem]:space-y-1">
                     @foreach ($wochen as $woche)
                         @php
                             $ersterTag = $tage[$woche[0]]['datum'];
                             $ende = end($woche);
                             $nr = $ersterTag->isoWeek;
                         @endphp
-                        <div class="rounded-lg border border-gray-200 xl:rounded-none xl:border-0">
-                            <div class="border-b border-gray-200 bg-gray-50 px-3 py-1.5 text-sm font-semibold text-gray-700 xl:hidden">KW {{ $nr }}</div>
-                            <div class="grid grid-cols-1 gap-1 p-1 sm:grid-cols-2 xl:grid-cols-[3.5rem_repeat(7,minmax(0,1fr))_10rem] xl:p-0">
+                        <div class="rounded-lg border border-gray-200 min-[85rem]:rounded-none min-[85rem]:border-0">
+                            <div class="border-b border-gray-200 bg-gray-50 px-3 py-1.5 text-sm font-semibold text-gray-700 min-[85rem]:hidden">KW {{ $nr }}</div>
+                            <div class="grid grid-cols-1 gap-1 p-1 sm:grid-cols-2 min-[85rem]:grid-cols-[3rem_repeat(7,minmax(0,1fr))_8.5rem] min-[85rem]:p-0">
                                 {{-- Kalenderwoche am Wochenanfang (breite Bildschirme; schmal steht sie oben drüber) --}}
-                                <div class="hidden items-start justify-center rounded-md bg-gray-50 pt-1.5 text-sm font-semibold text-gray-600 xl:flex">KW {{ $nr }}</div>
+                                <div class="hidden items-start justify-center rounded-md bg-gray-50 pt-1.5 text-sm font-semibold text-gray-600 min-[85rem]:flex">KW {{ $nr }}</div>
 
                                 {{-- Leere Felder vor dem Monatsersten --}}
                                 @for ($leer = 1; $leer < $ersterTag->dayOfWeekIso; $leer++)
-                                    <div class="hidden rounded-md bg-gray-50/60 xl:block"></div>
+                                    <div class="hidden rounded-md bg-gray-50/60 min-[85rem]:block"></div>
                                 @endfor
 
                                 @foreach ($woche as $d)
@@ -157,11 +159,11 @@
                                         $weg = collect($personen)->filter(fn ($p) => isset($p['abwesend'][$d]));
                                         $fehlt = implode(' · ', array_merge(array_map(fn ($x) => 'Mindestens: '.$x, $pt['fehlt']), array_map(fn ($x) => 'Optional: '.$x, $pt['optional'])));
                                     @endphp
-                                    <div class="flex min-w-0 flex-col rounded-md border p-1.5 xl:min-h-28 {{ $t['offen'] ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50' }} {{ $heute ? 'ring-2 ring-indigo-400' : '' }}">
+                                    <div class="flex min-w-0 flex-col rounded-md border p-1 min-[85rem]:min-h-28 {{ $t['offen'] ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50' }} {{ $heute ? 'ring-2 ring-indigo-400' : '' }}">
                                         <div class="mb-1 flex items-start justify-between gap-1">
                                             <div class="min-w-0 break-words leading-tight">
                                                 <span class="text-sm font-semibold {{ $t['offen'] ? 'text-gray-800' : 'text-gray-400' }}">{{ $t['datum']->day }}.</span>
-                                                <span class="text-xs text-gray-500 xl:hidden">{{ $t['datum']->isoFormat('dddd') }}</span>
+                                                <span class="text-xs text-gray-500 min-[85rem]:hidden">{{ $t['datum']->isoFormat('dddd') }}</span>
                                                 @if ($t['hinweis'])
                                                     <div class="text-[11px] {{ $t['offen'] ? 'text-indigo-600' : 'text-red-500' }}">{{ $t['hinweis'] }}</div>
                                                 @elseif (! $t['offen'])
@@ -192,17 +194,17 @@
                                                 @if ($planer)
                                                     <button type="button" title="{{ $titel }}"
                                                             @click="oeffne({{ $uid }}, @js($p['user']->name), '{{ $d }}', @js($t['datum']->isoFormat('dd DD.MM.')), @js($t['datum']->isoFormat('dddd')), '{{ $s->von }}', '{{ $s->bis }}', '{{ $s->pause }}', @js($s->notiz ?? ''))"
-                                                            class="flex w-full flex-wrap items-center gap-x-1 rounded px-1.5 py-0.5 text-left text-xs {{ $farbe[$uid] }} {{ $warn ? 'ring-2 ring-red-500' : '' }} {{ $uid === $ich ? 'font-semibold' : '' }}">
+                                                            class="flex w-full items-center gap-0.5 whitespace-nowrap rounded px-1 py-0.5 text-left text-[11px] tabular-nums {{ $farbe[$uid] }} {{ $warn ? 'ring-2 ring-red-500' : '' }} {{ $uid === $ich ? 'font-semibold' : '' }}">
                                                         <span class="font-semibold">{{ $kurz($p['user']->name) }}</span>
-                                                        <span class="flex-1 text-right">{{ $s->von }}–<wbr>{{ $s->bis }}</span>
-                                                        @if ($ue)<i class="bx bx-time-five text-sm text-amber-600" title="Überstunden: +{{ $dauer($ue) }} Std. über dem Wochensoll"></i>@endif
+                                                        <span class="flex-1 text-right">{{ $zeit($s->von) }}–{{ $zeit($s->bis) }}</span>
+                                                        @if ($ue)<i class="bx bx-time-five inline-block w-3 shrink-0 overflow-hidden text-xs leading-none text-amber-600" title="Überstunden: +{{ $dauer($ue) }} Std. über dem Wochensoll"></i>@endif
                                                     </button>
                                                 @else
                                                     <div title="{{ $titel }}"
-                                                         class="flex flex-wrap items-center gap-x-1 rounded px-1.5 py-0.5 text-xs {{ $farbe[$uid] }} {{ $uid === $ich ? 'font-semibold' : '' }}">
+                                                         class="flex items-center gap-0.5 whitespace-nowrap rounded px-1 py-0.5 text-[11px] tabular-nums {{ $farbe[$uid] }} {{ $uid === $ich ? 'font-semibold' : '' }}">
                                                         <span class="font-semibold">{{ $kurz($p['user']->name) }}</span>
-                                                        <span class="flex-1 text-right">{{ $s->von }}–<wbr>{{ $s->bis }}</span>
-                                                        @if ($ue)<i class="bx bx-time-five text-sm text-amber-600" title="Überstunden: +{{ $dauer($ue) }} Std. über dem Wochensoll"></i>@endif
+                                                        <span class="flex-1 text-right">{{ $zeit($s->von) }}–{{ $zeit($s->bis) }}</span>
+                                                        @if ($ue)<i class="bx bx-time-five inline-block w-3 shrink-0 overflow-hidden text-xs leading-none text-amber-600" title="Überstunden: +{{ $dauer($ue) }} Std. über dem Wochensoll"></i>@endif
                                                     </div>
                                                 @endif
                                             @endforeach
@@ -221,22 +223,21 @@
 
                                 {{-- Leere Felder nach dem Monatsletzten --}}
                                 @for ($leer = $tage[$ende]['datum']->dayOfWeekIso; $leer < 7; $leer++)
-                                    <div class="hidden rounded-md bg-gray-50/60 xl:block"></div>
+                                    <div class="hidden rounded-md bg-gray-50/60 min-[85rem]:block"></div>
                                 @endfor
 
                                 {{-- Wochensumme: Plan / Soll je Person --}}
-                                <div class="min-w-0 rounded-md bg-gray-100 p-1.5 text-xs sm:col-span-2 xl:col-span-1">
+                                <div class="min-w-0 rounded-md bg-gray-100 p-1.5 text-xs sm:col-span-2 min-[85rem]:col-span-1">
                                     <div class="mb-1 font-semibold text-gray-700">Summe</div>
                                     @foreach ($personen as $uid => $p)
                                         @php $w = $pruefung['wochen'][$uid][$ende] ?? ['ist' => 0, 'soll' => 0]; $diff = $w['ist'] - $w['soll']; @endphp
                                         @if ($w['ist'] || $w['soll'])
-                                            {{-- Umbrechen statt überlaufen: die Abweichung rutscht bei Platzmangel in die nächste Zeile. --}}
-                                            <div class="flex flex-wrap items-center gap-x-1.5 py-0.5" title="{{ $p['user']->name }}">
+                                            {{-- Eine Zeile: Ist / Soll; die Ist-Zahl färbt sich bei Abweichung, die Differenz steht im Mouseover. --}}
+                                            <div class="flex items-center gap-1 whitespace-nowrap py-0.5 text-[11px] tabular-nums"
+                                                 title="{{ $p['user']->name }}: Plan {{ $dauer($w['ist']) }}{{ $p['aushilfe'] ? '' : ' · Soll '.$dauer($w['soll']).(abs($diff) >= 15 ? ' · '.$vz($diff) : '') }}">
                                                 <span class="rounded px-1 font-semibold {{ $farbe[$uid] }}">{{ $kurz($p['user']->name) }}</span>
-                                                <span class="whitespace-nowrap text-gray-800">{{ $dauer($w['ist']) }}@if (! $p['aushilfe'])<span class="text-gray-500"> / {{ $dauer($w['soll']) }}</span>@endif</span>
-                                                @if (! $p['aushilfe'] && abs($diff) >= 15)
-                                                    <span class="ml-auto whitespace-nowrap font-semibold {{ $diff > 0 ? 'text-amber-700' : 'text-red-600' }}">{{ $vz($diff) }}</span>
-                                                @endif
+                                                <span class="font-semibold {{ $p['aushilfe'] || abs($diff) < 15 ? 'text-gray-800' : ($diff > 0 ? 'text-amber-700' : 'text-red-600') }}">{{ $dauer($w['ist']) }}</span>
+                                                @if (! $p['aushilfe'])<span class="text-gray-500">/ {{ $dauer($w['soll']) }}</span>@endif
                                             </div>
                                         @endif
                                     @endforeach
@@ -252,7 +253,7 @@
                 <span><span class="inline-block rounded bg-amber-300 px-1 text-white">~</span> optionale Besetzung fehlt</span>
                 <span><span class="inline-block rounded bg-red-500 px-1 font-bold text-white">!</span> unter Mindestbesetzung</span>
                 <span><i class="bx bx-time-five text-amber-600"></i> Überstunden (Mauszeiger drauf zeigt wie viele)</span>
-                <span>Σ = Plan / Soll der Woche (Feiertage und Abwesenheit gutgeschrieben)</span>
+                <span>Summe = Plan / Soll der Woche, <span class="text-amber-700">über</span> bzw. <span class="text-red-600">unter</span> Soll eingefärbt (Feiertage und Abwesenheit gutgeschrieben)</span>
                 @if ($planer)<span>Schicht anklicken zum Ändern, + zum Eintragen</span>@endif
             </div>
         @endif
