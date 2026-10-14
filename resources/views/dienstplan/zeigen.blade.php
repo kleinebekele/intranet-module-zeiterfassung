@@ -90,7 +90,14 @@
                 foreach (array_keys($personen) as $nr => $uid) {
                     $farbe[$uid] = $farben[$nr % count($farben)];
                 }
-                $kurz = fn ($name) => \Illuminate\Support\Str::of($name)->explode(' ')->first();
+                // Initialen: „Anna Berg" → AB, „Admin" → Ad. Wer gemeint ist, zeigt die Farbe (und der Mouseover).
+                $kurz = function (string $name): string {
+                    $teile = preg_split('/\s+/', trim(preg_replace('/\(.*?\)/', '', $name))) ?: [$name];
+
+                    return count($teile) > 1
+                        ? mb_strtoupper(mb_substr($teile[0], 0, 1).mb_substr(end($teile), 0, 1))
+                        : mb_substr($teile[0], 0, 2);
+                };
             @endphp
 
             {{-- Personen: Farbe, Monat geplant / Soll --}}
@@ -185,23 +192,23 @@
                                                 @if ($planer)
                                                     <button type="button" title="{{ $titel }}"
                                                             @click="oeffne({{ $uid }}, @js($p['user']->name), '{{ $d }}', @js($t['datum']->isoFormat('dd DD.MM.')), @js($t['datum']->isoFormat('dddd')), '{{ $s->von }}', '{{ $s->bis }}', '{{ $s->pause }}', @js($s->notiz ?? ''))"
-                                                            class="flex w-full flex-wrap items-center justify-between gap-x-1 rounded px-1.5 py-0.5 text-left text-xs {{ $farbe[$uid] }} {{ $warn ? 'ring-2 ring-red-500' : '' }} {{ $uid === $ich ? 'font-semibold' : '' }}">
-                                                        <span class="truncate">{{ $kurz($p['user']->name) }}</span>
-                                                        <span class="whitespace-nowrap">{{ $s->von }}–{{ $s->bis }}</span>
-                                                        @if ($ue)<span class="basis-full text-right"><span class="rounded bg-amber-400 px-1 text-[10px] font-bold text-white">Ü +{{ $dauer($ue) }}</span></span>@endif
+                                                            class="flex w-full items-center gap-1 rounded px-1.5 py-0.5 text-left text-xs {{ $farbe[$uid] }} {{ $warn ? 'ring-2 ring-red-500' : '' }} {{ $uid === $ich ? 'font-semibold' : '' }}">
+                                                        <span class="font-semibold">{{ $kurz($p['user']->name) }}</span>
+                                                        <span class="flex-1 whitespace-nowrap text-right">{{ $s->von }}–{{ $s->bis }}</span>
+                                                        @if ($ue)<i class="bx bx-time-five text-sm text-amber-600" title="Überstunden: +{{ $dauer($ue) }} Std. über dem Wochensoll"></i>@endif
                                                     </button>
                                                 @else
                                                     <div title="{{ $titel }}"
-                                                         class="flex flex-wrap items-center justify-between gap-x-1 rounded px-1.5 py-0.5 text-xs {{ $farbe[$uid] }} {{ $uid === $ich ? 'font-semibold' : '' }}">
-                                                        <span class="truncate">{{ $kurz($p['user']->name) }}</span>
-                                                        <span class="whitespace-nowrap">{{ $s->von }}–{{ $s->bis }}</span>
-                                                        @if ($ue)<span class="basis-full text-right"><span class="rounded bg-amber-400 px-1 text-[10px] font-bold text-white">Ü +{{ $dauer($ue) }}</span></span>@endif
+                                                         class="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs {{ $farbe[$uid] }} {{ $uid === $ich ? 'font-semibold' : '' }}">
+                                                        <span class="font-semibold">{{ $kurz($p['user']->name) }}</span>
+                                                        <span class="flex-1 whitespace-nowrap text-right">{{ $s->von }}–{{ $s->bis }}</span>
+                                                        @if ($ue)<i class="bx bx-time-five text-sm text-amber-600" title="Überstunden: +{{ $dauer($ue) }} Std. über dem Wochensoll"></i>@endif
                                                     </div>
                                                 @endif
                                             @endforeach
                                             @foreach ($weg as $uid => $p)
                                                 <div class="truncate rounded bg-sky-50 px-1.5 py-0.5 text-[11px] text-sky-700" title="{{ $p['abwesend'][$d] }}">
-                                                    {{ $kurz($p['user']->name) }}: {{ $p['abwesend'][$d] }}
+                                                    {{ $kurz($p['user']->name) }} {{ $p['abwesend'][$d] }}
                                                 </div>
                                             @endforeach
                                             @if ($planer)
@@ -223,8 +230,8 @@
                                     @foreach ($personen as $uid => $p)
                                         @php $w = $pruefung['wochen'][$uid][$ende] ?? ['ist' => 0, 'soll' => 0]; $diff = $w['ist'] - $w['soll']; @endphp
                                         @if ($w['ist'] || $w['soll'])
-                                            <div class="py-0.5 leading-tight">
-                                                <div class="truncate text-gray-600">{{ $p['user']->name }}</div>
+                                            <div class="flex items-center justify-between gap-1 py-0.5" title="{{ $p['user']->name }}">
+                                                <span class="rounded px-1 font-semibold {{ $farbe[$uid] }}">{{ $kurz($p['user']->name) }}</span>
                                                 <div class="whitespace-nowrap text-gray-800">
                                                     {{ $dauer($w['ist']) }}@if (! $p['aushilfe'])<span class="text-gray-500"> / {{ $dauer($w['soll']) }}</span>@endif
                                                     @if (! $p['aushilfe'] && abs($diff) >= 15)
@@ -245,7 +252,7 @@
                 <span><span class="text-green-600">✓</span> besetzt</span>
                 <span><span class="inline-block rounded bg-amber-300 px-1 text-white">~</span> optionale Besetzung fehlt</span>
                 <span><span class="inline-block rounded bg-red-500 px-1 font-bold text-white">!</span> unter Mindestbesetzung</span>
-                <span><span class="inline-block rounded bg-amber-400 px-1 font-bold text-white">Ü</span> Überstunden der Woche</span>
+                <span><i class="bx bx-time-five text-amber-600"></i> Überstunden (Mauszeiger drauf zeigt wie viele)</span>
                 <span>Σ = Plan / Soll der Woche (Feiertage und Abwesenheit gutgeschrieben)</span>
                 @if ($planer)<span>Schicht anklicken zum Ändern, + zum Eintragen</span>@endif
             </div>
