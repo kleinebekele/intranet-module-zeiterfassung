@@ -27,8 +27,8 @@ use Intranet\Modules\Zeiterfassung\Models\Zeitmodell;
  *     Person je Woche arbeitet, dort, wo am meisten Bedarf offen ist (Samstage reihum).
  *     Kurze Tage gleichen längere Tage aus, bis zur Öffnungszeit bzw. Tageshöchstzeit.
  *  2. Uhrzeiten: Wer bisher seltener früh war, öffnet; wer seltener spät war, schließt.
- *  3. Lücken: Öffnungszeit/Mindestbesetzung immer – angrenzende Schicht verlängern,
- *     sonst Aushilfe im Budget, sonst Stammkraft an ihrem freien Tag. Was über das
+ *  3. Lücken: Öffnungszeit/Mindestbesetzung immer – Aushilfe im Budget, sonst
+ *     angrenzende Schicht verlängern, sonst Stammkraft an ihrem freien Tag. Was über das
  *     Wochensoll geht, markiert die Prüfung als Überstunden. Optionale Besetzung nur
  *     mit Aushilfen-Budget.
  *  4. Aushilfen (einstellbar je Abteilung): ihre volle Zeit, dort wo am wenigsten los ist –
@@ -67,9 +67,6 @@ class Planer
 
     private int $maxTag;
 
-    /** @var array<int, array{von: string, bis: string}> Kernarbeitszeit je Wochentag (1 = Montag) */
-    private array $kern = [];
-
     public Carbon $bis;
 
     public function __construct(public Abteilung $abteilung, public Carbon $monat)
@@ -78,7 +75,6 @@ class Planer
         $this->bis = $this->monat->copy()->endOfMonth()->startOfDay();
         $this->ruhezeit = Einstellungen::int('ruhezeit');
         $this->maxTag = Einstellungen::int('max_tag');
-        $this->kern = $abteilung->kernzeiten ?? [];
 
         $this->besetzung = $abteilung->besetzung()->get();
         $this->sondertage = $abteilung->sondertage()
@@ -222,15 +218,18 @@ class Planer
                 }
             }
 
-            // Tagessoll: mit Zeitmodell genau dessen Soll (wie die Zeiterfassung rechnet), sonst die
-            // Wochenstunden gleich auf die ersten Wochentage verteilt (5 Tage = Mo–Fr). Feiertage und
+            // Tagessoll: mit Zeitmodell dessen Soll (wie die Zeiterfassung rechnet) – steht für diese
+            // Abteilung nur ein Teil der Sollzeit zur Verfügung, anteilig. Ohne Zeitmodell die Stunden
+            // der Abteilung gleich auf die ersten Wochentage (5 Tage = Mo–Fr). Feiertage und
             // Abwesenheiten werden gutgeschrieben: Sie mindern das Soll, im Konto fehlt nichts.
+            $modellWoche = $modell?->wochenMinuten() ?? 0;
+            $anteil = $modellWoche > 0 && $pivot->wochenstunden !== null ? (int) $pivot->wochenstunden / $modellWoche : 1.0;
             $sollTag = [];
             $gutschrift = 0;
             if (! $aushilfe) {
                 for ($d = $this->monat->copy(); $d->lte($this->bis); $d->addDay()) {
-                    $soll = $pivot->wochenstunden === null && $modell
-                        ? (Zeitmodell::amTag($liste, $d) ?? $modell)->sollFuer($d->dayOfWeekIso)
+                    $soll = $modellWoche > 0
+                        ? (int) round((Zeitmodell::amTag($liste, $d) ?? $modell)->sollFuer($d->dayOfWeekIso) * $anteil)
                         : ($d->dayOfWeekIso <= $tageWoche ? intdiv($wochen, $tageWoche) : 0);
                     if (Feiertage::name($d, $land)) {
                         $gutschrift += $soll;
@@ -259,6 +258,7 @@ class Planer
                 'frei' => array_map('intval', array_filter(explode(',', (string) $pivot->freie_tage))),
                 'abwesend' => $abwesend,
                 'modell' => $modell,
+                'modelle' => $liste,
             ];
         }
     }
@@ -492,7 +492,7 @@ class Planer
         }
 
         // Kernarbeitszeit: die Schicht deckt sie ganz ab (bzw. liegt ganz darin, wenn sie kürzer ist).
-        if ($kern = $this->kernAm($t)) {
+        if ($kern = $this->kernAm($uid, $t)) {
             [$kv, $kb] = $kern;
             $passend = array_values(array_filter($kandidaten, fn ($s) => $laenge >= $kb - $kv
                 ? $s <= $kv && $s + $laenge >= $kb
@@ -540,8 +540,8 @@ class Planer
      * Schritt 3: offene Viertelstunden auffüllen – 'min' = Öffnungszeit/Mindestbesetzung,
      * 'wunsch' = optionale Besetzung.
      *
-     * Mindestbesetzung immer: erst eine angrenzende Schicht verlängern (bis zur Tageshöchstzeit),
-     * dann eine Aushilfe im Budget, dann eine Stammkraft an ihrem freien Tag. Was dabei über das
+     * Mindestbesetzung immer: erst eine Aushilfe im Budget, dann eine angrenzende Schicht verlängern
+     * (bis zur Tageshöchstzeit), dann eine Stammkraft an ihrem freien Tag. Was dabei über das
      * Wochensoll hinausgeht, markiert die Prüfung als Überstunden.
      */
     private function luecken(string $stufe): void
@@ -560,14 +560,17 @@ class Planer
                 }
                 [$von, $bis] = $luecke;
 
-                if ($stufe === 'min' && $this->verlaengern($t, $von, $bis)) {
-                    continue;
-                }
-
                 $laenge = min(max($bis - $von, $minSchicht), $t['ende'] - $t['start'], self::anwesenheitFuer($this->maxTag));
                 $start = $von + $laenge > $t['ende'] ? max($t['start'], $t['ende'] - $laenge) : $von;
 
-                $uid = $this->kandidatFuerLuecke($t, $start, $start + $laenge, $stufe, $minSchicht);
+                // Reihenfolge: Aushilfe im Budget – dann angrenzende Schicht verlängern – dann Stammkraft am freien Tag.
+                $uid = $this->kandidatFuerLuecke($t, $start, $start + $laenge, $stufe, $minSchicht, mitStamm: false);
+                if ($uid === null && $stufe === 'min') {
+                    if ($this->verlaengern($t, $von, $bis)) {
+                        continue;
+                    }
+                    $uid = $this->kandidatFuerLuecke($t, $start, $start + $laenge, $stufe, $minSchicht, mitStamm: true);
+                }
                 if ($uid === null) {
                     $ab = $bis; // nicht zu füllen – weiter hinten suchen
                     continue;
@@ -662,15 +665,17 @@ class Planer
         return $summe;
     }
 
-    /** Kernarbeitszeit des Tages, auf die Öffnungszeit beschnitten – oder null. */
-    private function kernAm(array $t): ?array
+    /** Kernarbeitszeit der Person an dem Tag (aus ihrem Zeitmodell), auf die Öffnungszeit beschnitten – oder null. */
+    private function kernAm(int $uid, array $t): ?array
     {
-        $k = $this->kern[$t['datum']->dayOfWeekIso] ?? null;
+        $p = $this->personen[$uid];
+        $modell = Zeitmodell::amTag($p['modelle'], $t['datum']) ?? $p['modell'];
+        $k = $modell?->kernFuer($t['datum']->dayOfWeekIso);
         if (! $k) {
             return null;
         }
-        $von = max($t['start'], self::minute($k['von'] ?? null));
-        $bis = min($t['ende'], self::minute($k['bis'] ?? null));
+        $von = max($t['start'], $k[0]);
+        $bis = min($t['ende'], $k[1]);
 
         return $von < $bis ? [$von, $bis] : null;
     }
@@ -742,7 +747,7 @@ class Planer
     }
 
     /** Aushilfe mit Budget; für die Mindestbesetzung notfalls eine Stammkraft an ihrem freien Tag (Überstunden). */
-    private function kandidatFuerLuecke(array $t, int $von, int $bis, string $stufe, int $minSchicht): ?int
+    private function kandidatFuerLuecke(array $t, int $von, int $bis, string $stufe, int $minSchicht, bool $mitStamm): ?int
     {
         $i = $this->index($t['datum']);
         $arbeit = $bis - $von - self::pauseFuer($bis - $von);
@@ -778,7 +783,7 @@ class Planer
             return $aushilfen[0];
         }
 
-        if ($stufe !== 'min') {
+        if ($stufe !== 'min' || ! $mitStamm) {
             return null;
         }
 

@@ -134,7 +134,22 @@ class TeamController
             'urlaubstage' => ['required', 'numeric', 'min:0', 'max:99'],
             'bundesland' => ['nullable', 'in:'.implode(',', array_keys(Feiertage::LAENDER))],
             'notiz' => ['nullable', 'string', 'max:500'],
+            'kern' => ['nullable', 'array'],
+            'kern.*.von' => ['nullable', 'date_format:H:i'],
+            'kern.*.bis' => ['nullable', 'date_format:H:i'],
         ]);
+
+        // Kernarbeitszeit je Wochentag: beides leer = keine, sonst Ende nach Beginn.
+        $kern = [];
+        foreach ($data['kern'] ?? [] as $t => $k) {
+            if (empty($k['von']) && empty($k['bis'])) {
+                continue;
+            }
+            if (empty($k['von']) || empty($k['bis']) || $k['von'] >= $k['bis'] || ! isset(Zeitmodell::TAGE[(int) $t])) {
+                return back()->withInput()->with('error', 'Kernarbeitszeit: je Tag Beginn und Ende angeben (Ende nach Beginn) oder beides leer lassen.');
+            }
+            $kern[(int) $t] = ['von' => $k['von'], 'bis' => $k['bis']];
+        }
 
         $werte = [];
         foreach (array_keys(Zeitmodell::TAGE) as $t) {
@@ -151,14 +166,15 @@ class TeamController
         $modell->fill(
             $werte + [
                 'urlaubstage' => $data['urlaubstage'],
-                'bundesland' => $data['bundesland'] ?: null,
+                'bundesland' => ($data['bundesland'] ?? null) ?: null,
                 'notiz' => $data['notiz'] ?? null,
+                'kernzeiten' => $kern ?: null,
                 'erfasst_von' => $request->user()->id,
             ],
         )->save();
         Korrektur::audit('zeiterfassung.modell', 'Sollzeit ab '.Carbon::parse($data['gueltig_ab'])->format('d.m.Y'), $person);
 
-        return back()->with('status', 'Sollzeit gespeichert.');
+        return back()->with('status', 'Sollzeit gespeichert.')->with('offen', $person->id);
     }
 
     public function modellEntfernen(Request $request, User $person, Zeitmodell $modell)

@@ -21,47 +21,46 @@
     <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
         {{-- Gruppen --}}
         <div class="rounded-xl border border-gray-200 bg-white p-5 xl:col-span-2">
-            <h2 class="text-base font-semibold text-gray-800">Gruppen & Leitung</h2>
+            <h2 class="text-base font-semibold text-gray-800">Gruppen</h2>
             <p class="mt-1 text-sm text-gray-500">
-                Wer eine dieser Rollen hat, nimmt an der Zeiterfassung teil. Die Leitung sieht und korrigiert die Zeiten der Mitglieder
-                und gibt Anträge frei. Die Rolle „Zeiterfassung: Verwaltung" sieht alle.
+                Eine Gruppe ist eine Rolle: Wer sie hat, nimmt an der Zeiterfassung teil. Die Leitung sieht und korrigiert die Zeiten
+                der Mitglieder und gibt Anträge frei. Gruppe anklicken für Personen, Leitung, Sollzeit und Kernzeit.
             </p>
-            <div class="mt-4 divide-y divide-gray-100">
+            <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-3">
                 @forelse ($gruppen as $g)
-                    <form method="POST" action="{{ route('module.zeiterfassung.einstellungen.gruppe.leitung', $g) }}"
-                          class="flex flex-wrap items-start gap-3 py-3">
-                        @csrf
-                        <div class="w-56">
-                            <div class="font-medium text-gray-800">{{ $g->name() }}</div>
-                            <div class="text-xs text-gray-400">{{ $mitglieder[$g->role_id] ?? 0 }} Mitglieder</div>
+                    <a href="{{ route('module.zeiterfassung.einstellungen.gruppe', $g) }}"
+                       class="block rounded-lg border border-gray-200 p-3 hover:border-indigo-300 hover:bg-indigo-50/40">
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="font-medium text-gray-800">{{ $g->name() }}</span>
+                            <span class="text-xs text-gray-500">{{ $mitglieder[$g->role_id] ?? 0 }} Personen</span>
                         </div>
-                        <select name="leitung[]" multiple size="4" class="min-w-64 flex-1 rounded-lg border-gray-300 text-sm">
-                            @foreach ($benutzer as $b)
-                                <option value="{{ $b->id }}" @selected($g->leitung->contains('id', $b->id))>{{ $b->name }}</option>
-                            @endforeach
-                        </select>
-                        <div class="flex flex-col gap-2">
-                            <button type="submit" class="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700">Leitung speichern</button>
-                            <button type="submit" formaction="{{ route('module.zeiterfassung.einstellungen.gruppe.entfernen', $g) }}"
-                                    data-bestaetigen="Gruppe „{{ $g->name() }}“ aus der Zeiterfassung entfernen? Erfasste Zeiten bleiben erhalten." data-knopf="Entfernen"
-                                    class="rounded-lg px-3 py-1.5 text-sm text-red-600 hover:bg-red-50">Gruppe entfernen</button>
+                        <div class="mt-1 text-xs {{ $g->leitung->isEmpty() ? 'font-semibold text-red-600' : 'text-gray-500' }}">
+                            {{ $g->leitung->isEmpty() ? 'Noch keine Leitung' : 'Leitung: '.$g->leitung->pluck('name')->join(', ') }}
                         </div>
-                    </form>
+                    </a>
                 @empty
-                    <p class="py-3 text-sm text-gray-400">Noch keine Gruppe – ohne Gruppe nimmt niemand teil.</p>
+                    <p class="text-sm text-gray-400">Noch keine Gruppe – ohne Gruppe nimmt niemand teil.</p>
                 @endforelse
             </div>
-            <form method="POST" action="{{ route('module.zeiterfassung.einstellungen.gruppe.anlegen') }}" class="mt-3 flex flex-wrap gap-2 border-t border-gray-100 pt-3">
-                @csrf
-                <select name="role_id" required class="min-w-64 rounded-lg border-gray-300 text-sm">
-                    <option value="">Rolle als Gruppe hinzufügen …</option>
-                    @foreach ($rollen as $r)
-                        <option value="{{ $r->role_id }}">{{ $r->name }}</option>
-                    @endforeach
-                </select>
-                <button type="submit" class="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Hinzufügen</button>
-            </form>
-            <p class="mt-2 text-xs text-gray-400">Mehrfachauswahl in der Leitung: Strg (bzw. ⌘) gedrückt halten.</p>
+            <div class="mt-4 grid grid-cols-1 gap-3 border-t border-gray-100 pt-4 md:grid-cols-2">
+                <form method="POST" action="{{ route('module.zeiterfassung.einstellungen.gruppe.anlegen') }}" class="flex flex-wrap items-end gap-2">
+                    @csrf
+                    <label class="block min-w-56 flex-1 text-sm"><span class="text-gray-600">Neue Gruppe (legt die Rolle mit an)</span>
+                        <input type="text" name="name" required maxlength="255" placeholder="z. B. Filiale Bielefeld" class="mt-1 w-full rounded-lg border-gray-300 text-sm"></label>
+                    <button type="submit" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">Anlegen</button>
+                </form>
+                <form method="POST" action="{{ route('module.zeiterfassung.einstellungen.gruppe.anlegen') }}" class="flex flex-wrap items-end gap-2">
+                    @csrf
+                    <label class="block min-w-56 flex-1 text-sm"><span class="text-gray-600">oder vorhandene Rolle als Gruppe übernehmen</span>
+                        <select name="role_id" required class="mt-1 w-full rounded-lg border-gray-300 text-sm">
+                            <option value="">Rolle wählen …</option>
+                            @foreach ($rollen as $r)
+                                <option value="{{ $r->role_id }}">{{ $r->name }}</option>
+                            @endforeach
+                        </select></label>
+                    <button type="submit" class="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Übernehmen</button>
+                </form>
+            </div>
         </div>
 
         {{-- Regeln --}}

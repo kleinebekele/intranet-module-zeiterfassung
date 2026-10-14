@@ -69,32 +69,6 @@ class AbteilungController
         return back()->with('status', 'Abteilung gespeichert.');
     }
 
-    /** Kernarbeitszeit je Wochentag (leer = keine) – gilt für den automatischen Vorschlag. */
-    public function kernzeiten(Request $request, Abteilung $abteilung)
-    {
-        $this->darf($request);
-        $data = $request->validate([
-            'kern' => ['nullable', 'array'],
-            'kern.*.von' => ['nullable', 'date_format:H:i'],
-            'kern.*.bis' => ['nullable', 'date_format:H:i'],
-        ]);
-
-        $kern = [];
-        foreach ($data['kern'] ?? [] as $tag => $k) {
-            if (empty($k['von']) && empty($k['bis'])) {
-                continue;
-            }
-            if (empty($k['von']) || empty($k['bis']) || $k['von'] >= $k['bis'] || (int) $tag < 1 || (int) $tag > 7) {
-                return back()->withInput()->with('error', 'Kernarbeitszeit: bitte je Tag Beginn und Ende angeben (Ende nach Beginn) oder beides leer lassen.');
-            }
-            $kern[(int) $tag] = ['von' => $k['von'], 'bis' => $k['bis']];
-        }
-
-        $abteilung->update(['kernzeiten' => $kern ?: null]);
-
-        return back()->with('status', 'Kernarbeitszeit gespeichert.');
-    }
-
     /** Alle Zeitfenster auf einmal: vorhandene ändern/löschen, neues für mehrere Wochentage anlegen. */
     public function besetzung(Request $request, Abteilung $abteilung)
     {

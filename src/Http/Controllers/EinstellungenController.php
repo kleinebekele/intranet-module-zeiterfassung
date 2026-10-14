@@ -5,8 +5,11 @@ namespace Intranet\Modules\Zeiterfassung\Http\Controllers;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Intranet\Modules\Zeiterfassung\Models\Gruppe;
 use Intranet\Modules\Zeiterfassung\Models\Terminal;
+use Intranet\Modules\Zeiterfassung\Models\Zeitmodell;
 use Intranet\Modules\Zeiterfassung\Support\Einstellungen;
 use Intranet\Modules\Zeiterfassung\Support\Feiertage;
 use Intranet\Modules\Zeiterfassung\Support\Format;
@@ -25,7 +28,8 @@ class EinstellungenController
 
         return view('zeiterfassung::einstellungen.index', [
             'gruppen' => $gruppen,
-            'mitglieder' => \Illuminate\Support\Facades\DB::table('user_roles')->whereIn('role_id', $gruppen->pluck('role_id'))
+            'leitungFehlt' => $gruppen->filter(fn (Gruppe $g) => $g->leitung->isEmpty())->count(),
+            'mitglieder' => DB::table('user_roles')->whereIn('role_id', $gruppen->pluck('role_id'))
                 ->selectRaw('role_id, count(*) as n')->groupBy('role_id')->pluck('n', 'role_id'),
             'rollen' => Role::aktiv()->whereNotIn('role_id', $gruppen->pluck('role_id'))->orderBy('name')->get(),
             'benutzer' => User::orderBy('name')->get(['id', 'name']),
@@ -63,26 +67,122 @@ class EinstellungenController
         return back()->with('status', 'Regeln gespeichert.');
     }
 
+    /**
+     * Neue Gruppe: entweder eine neue Rolle mit diesem Namen (Rolle = Gruppe) oder eine
+     * vorhandene Rolle übernehmen. Danach geht es auf die Gruppenseite (Mitglieder, Leitung).
+     */
     public function gruppeAnlegen(Request $request)
     {
         $this->darf($request);
-        $data = $request->validate(['role_id' => ['required', 'string', 'exists:roles,role_id']]);
+        $data = $request->validate([
+            'name' => ['nullable', 'required_without:role_id', 'string', 'max:255'],
+            'role_id' => ['nullable', 'string', 'exists:roles,role_id'],
+        ]);
 
-        Gruppe::firstOrCreate(['role_id' => $data['role_id']]);
+        if (! empty($data['role_id'])) {
+            $rolle = Role::findOrFail($data['role_id']);
+        } else {
+            $basis = Str::slug($data['name']) ?: 'gruppe';
+            $schluessel = Str::limit($basis, 56, '');
+            for ($n = 2; Role::whereKey($schluessel)->exists(); $n++) {
+                $schluessel = Str::limit($basis, 56, '').'-'.$n;
+            }
+            $rolle = Role::create(['role_id' => $schluessel, 'name' => $data['name']]);
+            Korrektur::audit('zeiterfassung.einstellungen', "Rolle „{$rolle->name}\" angelegt", null);
+        }
+
+        $gruppe = Gruppe::firstOrCreate(['role_id' => $rolle->role_id]);
         Rechte::vergessen();
 
-        return back()->with('status', 'Gruppe angelegt – jetzt die Leitung eintragen.');
+        return redirect()->route('module.zeiterfassung.einstellungen.gruppe', $gruppe)
+            ->with('status', 'Gruppe angelegt – jetzt Personen und Leitung eintragen.');
+    }
+
+    /** Gruppenseite: Mitglieder mit Sollzeit und Kernzeit, Leitung. */
+    public function gruppe(Request $request, Gruppe $gruppe)
+    {
+        $this->darf($request);
+        $gruppe->load(['rolle', 'leitung']);
+
+        $mitglieder = User::whereIn('id', DB::table('user_roles')->where('role_id', $gruppe->role_id)->pluck('user_id'))
+            ->orderBy('name')->get();
+        $modelle = Zeitmodell::whereIn('user_id', $mitglieder->pluck('id'))->orderBy('gueltig_ab')->orderBy('id')->get()
+            ->groupBy('user_id')
+            // gültiges Modell von heute; gibt es erst eins ab später, dieses zeigen
+            ->map(fn ($liste) => Zeitmodell::amTag($liste, today()) ?? $liste->first());
+
+        return view('zeiterfassung::einstellungen.gruppe', [
+            'gruppe' => $gruppe,
+            'mitglieder' => $mitglieder,
+            'modelle' => $modelle,
+            'benutzer' => User::orderBy('name')->get(['id', 'name']),
+            'laender' => Feiertage::LAENDER,
+            'standardLand' => Einstellungen::get('bundesland'),
+            'mitgliederFest' => (bool) $gruppe->rolle?->istVerwaltet(),
+        ]);
+    }
+
+    public function gruppeName(Request $request, Gruppe $gruppe)
+    {
+        $this->darf($request);
+        $data = $request->validate(['name' => ['required', 'string', 'max:255']]);
+        $rolle = $gruppe->rolle;
+        abort_unless($rolle && ! $rolle->istVerwaltet() && ! $rolle->stammtAusManifest() && ! $rolle->isSystem(), 403);
+
+        $rolle->update(['name' => $data['name']]);
+
+        return back()->with('status', 'Name gespeichert.');
+    }
+
+    public function gruppeMitglied(Request $request, Gruppe $gruppe)
+    {
+        $this->darf($request);
+        abort_if((bool) $gruppe->rolle?->istVerwaltet(), 403);
+        $data = $request->validate(['user_id' => ['required', 'integer', 'exists:users,id']]);
+
+        DB::table('user_roles')->insertOrIgnore(['user_id' => $data['user_id'], 'role_id' => $gruppe->role_id]);
+        Rechte::vergessen();
+        Korrektur::audit('zeiterfassung.einstellungen', 'Mitglied zur Gruppe '.$gruppe->name().' hinzugefügt', User::find($data['user_id']));
+
+        return back()->with('status', 'Person hinzugefügt.');
+    }
+
+    public function gruppeMitgliedEntfernen(Request $request, Gruppe $gruppe, User $person)
+    {
+        $this->darf($request);
+        abort_if((bool) $gruppe->rolle?->istVerwaltet(), 403);
+
+        DB::table('user_roles')->where('user_id', $person->id)->where('role_id', $gruppe->role_id)->delete();
+        Rechte::vergessen();
+        Korrektur::audit('zeiterfassung.einstellungen', 'Mitglied aus der Gruppe '.$gruppe->name().' entfernt', $person);
+
+        return back()->with('status', "{$person->name} aus der Gruppe entfernt. Erfasste Zeiten bleiben erhalten.");
     }
 
     public function gruppeLeitung(Request $request, Gruppe $gruppe)
     {
         $this->darf($request);
-        $data = $request->validate(['leitung' => ['nullable', 'array'], 'leitung.*' => ['integer', 'exists:users,id']]);
+        $data = $request->validate(['user_id' => ['required', 'integer', 'exists:users,id']]);
 
-        $gruppe->leitung()->sync($data['leitung'] ?? []);
-        Korrektur::audit('zeiterfassung.einstellungen', 'Leitung der Gruppe '.$gruppe->name().' geändert', null);
+        $gruppe->leitung()->syncWithoutDetaching([$data['user_id']]);
+        Rechte::vergessen();
+        Korrektur::audit('zeiterfassung.einstellungen', 'Leitung der Gruppe '.$gruppe->name().' ergänzt', User::find($data['user_id']));
 
-        return back()->with('status', 'Leitung gespeichert.');
+        return back()->with('status', 'Leitung eingetragen.');
+    }
+
+    public function gruppeLeitungEntfernen(Request $request, Gruppe $gruppe, User $person)
+    {
+        $this->darf($request);
+        if ($gruppe->leitung()->count() <= 1) {
+            return back()->with('error', 'Eine Gruppe braucht mindestens eine Leitung – erst eine andere Person eintragen.');
+        }
+
+        $gruppe->leitung()->detach($person->id);
+        Rechte::vergessen();
+        Korrektur::audit('zeiterfassung.einstellungen', 'Leitung der Gruppe '.$gruppe->name().' entfernt', $person);
+
+        return back()->with('status', 'Leitung entfernt.');
     }
 
     public function gruppeEntfernen(Request $request, Gruppe $gruppe)

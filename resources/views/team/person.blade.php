@@ -66,41 +66,9 @@
             <div class="rounded-xl border border-gray-200 bg-white p-5">
                 <h2 class="text-base font-semibold text-gray-800">Sollarbeitszeit</h2>
                 <p class="mt-1 text-xs text-gray-500">Gilt ab dem Stichtag; vorherige Zeiträume rechnen mit dem alten Modell weiter.</p>
-                <form method="POST" action="{{ route('module.zeiterfassung.team.modell', $person) }}" class="mt-3 space-y-3">
-                    @csrf
-                    <div class="grid grid-cols-7 gap-2">
-                        @foreach (\Intranet\Modules\Zeiterfassung\Models\Zeitmodell::TAGE as $nr => $kurz)
-                            <label class="block text-center text-xs">
-                                <span class="text-gray-500">{{ $kurz }}</span>
-                                <input type="text" name="soll[{{ $nr }}]" inputmode="decimal" placeholder="0:00"
-                                       value="{{ old("soll.$nr", $aktuell ? \Intranet\Modules\Zeiterfassung\Support\Format::dauer($aktuell->sollFuer($nr)) : ($nr <= 5 ? '8:00' : '0:00')) }}"
-                                       class="mt-1 w-full rounded-lg border-gray-300 px-1 text-center text-sm">
-                            </label>
-                        @endforeach
-                    </div>
-                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                        <label class="block text-sm">
-                            <span class="text-gray-600">Gültig ab</span>
-                            <input type="date" name="gueltig_ab" required value="{{ old('gueltig_ab', $aktuell ? today()->startOfMonth()->toDateString() : today()->startOfYear()->toDateString()) }}" class="mt-1 w-full rounded-lg border-gray-300 text-sm">
-                        </label>
-                        <label class="block text-sm">
-                            <span class="text-gray-600">Urlaubstage / Jahr</span>
-                            <input type="number" name="urlaubstage" step="0.5" min="0" max="99" required value="{{ old('urlaubstage', $aktuell?->urlaubstage ?? 30) }}" class="mt-1 w-full rounded-lg border-gray-300 text-sm">
-                        </label>
-                        <label class="block text-sm">
-                            <span class="text-gray-600">Feiertage nach</span>
-                            <select name="bundesland" class="mt-1 w-full rounded-lg border-gray-300 text-sm">
-                                <option value="">Standard ({{ $laender[$standardLand] ?? $standardLand }})</option>
-                                @foreach ($laender as $code => $name)
-                                    <option value="{{ $code }}" @selected(old('bundesland', $aktuell?->bundesland) === $code)>{{ $name }}</option>
-                                @endforeach
-                            </select>
-                        </label>
-                    </div>
-                    <div class="flex justify-end">
-                        <button type="submit" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">Sollzeit speichern</button>
-                    </div>
-                </form>
+                <div class="mt-3">
+                    @include('zeiterfassung::partials.zeitmodell-form', ['person' => $person, 'aktuell' => $aktuell, 'laender' => $laender, 'standardLand' => $standardLand])
+                </div>
 
                 @if ($modelle->isNotEmpty())
                     <table class="mt-4 w-full text-xs">

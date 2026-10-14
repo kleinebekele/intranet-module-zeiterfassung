@@ -50,6 +50,7 @@ rollen: zeit-verwaltung
   anklicken und von Hand eintragen – auf Wunsch gleich für alle gleichen Wochentage des Monats. Die Öffnungszeit
   ist immer besetzt; was über das Wochensoll geht, steht als „Ü" an den letzten Schichten der Woche. Feiertage
   werden gutgeschrieben. Hinweise beachten, dann veröffentlichen.
-- **Einstellungen**: welche Rollen teilnehmen (Gruppen) und wer sie leitet, Terminals, Regeln.
+- **Einstellungen**: Gruppen anlegen (eine Gruppe ist eine Rolle), Personen und Leitung eintragen, je Person
+  Sollzeit und Kernarbeitszeit; außerdem Terminals und Regeln.
 
 Jede Änderung bleibt nachvollziehbar: Die alte Buchung wird nicht überschrieben, sondern als „ersetzt" aufbewahrt.

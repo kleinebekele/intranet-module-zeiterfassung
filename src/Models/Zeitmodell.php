@@ -25,7 +25,38 @@ class Zeitmodell extends Model
         return [
             'gueltig_ab' => 'date',
             'urlaubstage' => 'decimal:1',
+            'kernzeiten' => 'array',
         ];
+    }
+
+    /** Kernarbeitszeit eines Wochentags als [von, bis] in Minuten – oder null. */
+    public function kernFuer(int $isoWochentag): ?array
+    {
+        $k = ($this->kernzeiten ?? [])[$isoWochentag] ?? null;
+        if (! $k || empty($k['von']) || empty($k['bis'])) {
+            return null;
+        }
+        [$vh, $vm] = array_map('intval', explode(':', $k['von']));
+        [$bh, $bm] = array_map('intval', explode(':', $k['bis']));
+
+        return [$vh * 60 + $vm, $bh * 60 + $bm];
+    }
+
+    /** Kurztext für Übersichten, z. B. „Mo–Fr 10:00–17:00". */
+    public function kernText(): string
+    {
+        $gruppen = [];
+        foreach (self::TAGE as $nr => $kurz) {
+            $k = ($this->kernzeiten ?? [])[$nr] ?? null;
+            $zeit = $k && ! empty($k['von']) ? $k['von'].'–'.$k['bis'] : null;
+            if ($zeit !== null && $gruppen && end($gruppen)['zeit'] === $zeit && end($gruppen)['bis'] === $nr - 1) {
+                $gruppen[array_key_last($gruppen)]['bis'] = $nr;
+            } elseif ($zeit !== null) {
+                $gruppen[] = ['von' => $nr, 'bis' => $nr, 'zeit' => $zeit];
+            }
+        }
+
+        return implode(', ', array_map(fn ($g) => self::TAGE[$g['von']].($g['bis'] > $g['von'] ? '–'.self::TAGE[$g['bis']] : '').' '.$g['zeit'], $gruppen));
     }
 
     public function user(): BelongsTo

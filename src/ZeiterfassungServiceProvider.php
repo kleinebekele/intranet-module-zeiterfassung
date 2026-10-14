@@ -62,11 +62,13 @@ class ZeiterfassungServiceProvider extends ModuleServiceProvider
                 // Dienstplan: Planen prüft Rechte::darfPlanen, Ansehen die Abteilungszugehörigkeit.
                 'dienstplan.zeigen', 'dienstplan.druck', 'dienstplan.vorschlagen', 'dienstplan.schicht', 'dienstplan.status',
                 'dienstplan.abteilung', 'dienstplan.abteilung.anlegen', 'dienstplan.abteilung.speichern',
-                'dienstplan.abteilung.besetzung', 'dienstplan.abteilung.kernzeiten', 'dienstplan.abteilung.personen', 'dienstplan.abteilung.sondertag',
+                'dienstplan.abteilung.besetzung', 'dienstplan.abteilung.personen', 'dienstplan.abteilung.sondertag',
                 'dienstplan.abteilung.sondertag.entfernen', 'dienstplan.abteilung.entfernen',
             )
             ->stufe(Zugriffsstufe::Verwalten,
                 'einstellungen.regeln', 'einstellungen.gruppe.anlegen', 'einstellungen.gruppe.leitung',
+                'einstellungen.gruppe.leitung.entfernen', 'einstellungen.gruppe.name', 'einstellungen.gruppe.mitglied',
+                'einstellungen.gruppe.mitglied.entfernen',
                 'einstellungen.gruppe.entfernen', 'einstellungen.terminal.anlegen', 'einstellungen.terminal.speichern',
                 'einstellungen.terminal.schluessel', 'einstellungen.terminal.entfernen');
     }

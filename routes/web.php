@@ -64,7 +64,6 @@ Route::middleware(['web', 'auth'])
         Route::post('dienstplan/{abteilung}/status', [DienstplanController::class, 'status'])->name('dienstplan.status');
         Route::get('dienstplan/{abteilung}/abteilung', [AbteilungController::class, 'bearbeiten'])->name('dienstplan.abteilung');
         Route::post('dienstplan/{abteilung}/abteilung', [AbteilungController::class, 'speichern'])->name('dienstplan.abteilung.speichern');
-        Route::post('dienstplan/{abteilung}/kernzeiten', [AbteilungController::class, 'kernzeiten'])->name('dienstplan.abteilung.kernzeiten');
         Route::post('dienstplan/{abteilung}/besetzung', [AbteilungController::class, 'besetzung'])->name('dienstplan.abteilung.besetzung');
         Route::post('dienstplan/{abteilung}/personen', [AbteilungController::class, 'personen'])->name('dienstplan.abteilung.personen');
         Route::post('dienstplan/{abteilung}/sondertage', [AbteilungController::class, 'sondertag'])->name('dienstplan.abteilung.sondertag');
@@ -74,7 +73,12 @@ Route::middleware(['web', 'auth'])
         Route::get('einstellungen', [EinstellungenController::class, 'index'])->name('einstellungen.index');
         Route::post('einstellungen/regeln', [EinstellungenController::class, 'regeln'])->name('einstellungen.regeln');
         Route::post('einstellungen/gruppen', [EinstellungenController::class, 'gruppeAnlegen'])->name('einstellungen.gruppe.anlegen');
-        Route::post('einstellungen/gruppen/{gruppe}', [EinstellungenController::class, 'gruppeLeitung'])->name('einstellungen.gruppe.leitung');
+        Route::get('einstellungen/gruppen/{gruppe}', [EinstellungenController::class, 'gruppe'])->name('einstellungen.gruppe');
+        Route::post('einstellungen/gruppen/{gruppe}/name', [EinstellungenController::class, 'gruppeName'])->name('einstellungen.gruppe.name');
+        Route::post('einstellungen/gruppen/{gruppe}/mitglied', [EinstellungenController::class, 'gruppeMitglied'])->name('einstellungen.gruppe.mitglied');
+        Route::post('einstellungen/gruppen/{gruppe}/mitglied/{person}/entfernen', [EinstellungenController::class, 'gruppeMitgliedEntfernen'])->name('einstellungen.gruppe.mitglied.entfernen');
+        Route::post('einstellungen/gruppen/{gruppe}/leitung', [EinstellungenController::class, 'gruppeLeitung'])->name('einstellungen.gruppe.leitung');
+        Route::post('einstellungen/gruppen/{gruppe}/leitung/{person}/entfernen', [EinstellungenController::class, 'gruppeLeitungEntfernen'])->name('einstellungen.gruppe.leitung.entfernen');
         Route::post('einstellungen/gruppen/{gruppe}/entfernen', [EinstellungenController::class, 'gruppeEntfernen'])->name('einstellungen.gruppe.entfernen');
         Route::post('einstellungen/terminals', [EinstellungenController::class, 'terminalAnlegen'])->name('einstellungen.terminal.anlegen');
         Route::post('einstellungen/terminals/{terminal}', [EinstellungenController::class, 'terminalSpeichern'])->name('einstellungen.terminal.speichern');

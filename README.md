@@ -24,7 +24,7 @@ Den Seitenzugang regelt der Core (Menüpunkt ↔ Rolle). Darüber hinaus:
 
 | Wer | darf |
 |---|---|
-| Mitglied einer **Gruppe** (eine Rolle, die unter Einstellungen als Gruppe eingetragen ist) | nimmt teil, stempelt am Terminal |
+| Mitglied einer **Gruppe** (eine Rolle; unter Einstellungen neu anlegen oder vorhandene übernehmen, dort auch Personen, Leitung, Sollzeit) | nimmt teil, stempelt am Terminal |
 | Leitung einer Gruppe | Zeiten der Mitglieder sehen und ändern, Anträge freigeben, Sollzeiten pflegen |
 | `zeit-verwaltung` | alle Teilnehmer, Einstellungen, eigene Nachträge sofort gültig |
 | `zeit-homeoffice` | Stempeln im Intranet |
@@ -50,15 +50,16 @@ das Soll), dem Mitarbeiter fehlt dadurch nichts. Geplant wird je Kalenderwoche:
    wo am meisten Bedarf offen ist; Samstage reihum. Kurze Tage (Samstag) gleichen längere Tage aus, bis zur
    Öffnungszeit bzw. Tageshöchstzeit.
 2. **Früh/Spät im Wechsel**: Wer bisher seltener früh war, öffnet; wer seltener spät war, schließt.
-3. **Öffnungszeit immer besetzt**: angrenzende Schicht verlängern, sonst Aushilfe im Budget, sonst Stammkraft an
+3. **Öffnungszeit immer besetzt**: Aushilfe im Budget, sonst angrenzende Schicht verlängern, sonst Stammkraft an
    ihrem freien Tag. Was über das Wochensoll geht, wird als Überstunden markiert. Optionale Besetzung nur mit
    Aushilfen-Budget.
 
 4. **Aushilfen** (je Abteilung einstellbar): immer ihre volle Zeit (Monatsbudget bzw. Wochenstunden) dort, wo am
    wenigsten los ist – oder nur bei Lücken.
 
-**Kernarbeitszeit** je Wochentag (Einstellungen der Abteilung): automatisch geplante Schichten der Stammkräfte decken
-sie ganz ab.
+**Sollzeit und Kernarbeitszeit** je Person stehen im Zeitmodell (Einstellungen → Gruppe); automatisch geplante
+Schichten der Stammkräfte decken die Kernarbeitszeit ab. In der Abteilung lässt sich festlegen, wie viele Stunden der
+Sollzeit dort zur Verfügung stehen (leer = alle).
 
 Gleich gute Möglichkeiten entscheidet das Los – „Neu vorschlagen" liefert jedes Mal eine andere Variante.
 Ruhezeit, Tageshöchstzeit und Pausen aus den Einstellungen gelten immer; beantragter Urlaub blockiert wie genehmigter.

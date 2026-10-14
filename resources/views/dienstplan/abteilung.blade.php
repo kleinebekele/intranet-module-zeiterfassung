@@ -79,8 +79,9 @@
         <div class="rounded-xl border border-gray-200 bg-white p-5 xl:col-span-2">
             <h2 class="text-base font-semibold text-gray-800">Personen</h2>
             <p class="mt-1 text-sm text-gray-500">
-                Wochenstunden leer = aus dem Zeitmodell der Person (Team → Person). <strong>Aushilfen</strong> springen nur bei Lücken und
-                für die optionale Besetzung ein, höchstens bis zu ihrem Monatsbudget (z. B. Minijob-Grenze ÷ Stundenlohn).
+                Sollzeit und Kernarbeitszeit stehen im Zeitmodell der Person (Zeiterfassung → Einstellungen → Gruppe).
+                <strong>Stunden für diese Abteilung</strong>: wie viel der Sollzeit hier eingeplant wird – leer = die ganze Sollzeit.
+                <strong>Aushilfen</strong> planen mit ihrem Monatsbudget (z. B. Minijob-Grenze ÷ Stundenlohn).
             </p>
             <form method="POST" action="{{ route('module.zeiterfassung.dienstplan.abteilung.personen', $abteilung) }}" class="mt-4">
                 @csrf
@@ -90,7 +91,7 @@
                             <tr>
                                 <th class="px-2 py-2 font-semibold">Person</th>
                                 <th class="px-2 py-2 font-semibold">Aushilfe</th>
-                                <th class="px-2 py-2 font-semibold">Wochenstunden</th>
+                                <th class="px-2 py-2 font-semibold">Stunden für diese Abteilung</th>
                                 <th class="px-2 py-2 font-semibold">Budget / Monat</th>
                                 <th class="px-2 py-2 font-semibold">Tage / Woche</th>
                                 <th class="px-2 py-2 font-semibold">Feste freie Tage</th>
@@ -107,11 +108,15 @@
                                     <td class="px-2 py-1.5">
                                         <div class="font-medium text-gray-800">{{ $p->name }}</div>
                                         <div class="text-xs text-gray-400">
-                                            {{ $m ? 'Zeitmodell: '.$dauer($m->wochenMinuten()).' Std. an '.$m->arbeitstageJeWoche().' Tagen' : 'kein Zeitmodell' }}
+                                            @if ($m)
+                                                Soll {{ $dauer($m->wochenMinuten()) }} Std./Woche an {{ $m->arbeitstageJeWoche() }} Tagen{{ $m->kernText() ? ' · Kernzeit '.$m->kernText() : '' }}
+                                            @else
+                                                <span class="text-red-600">noch keine Sollzeit</span> – in Zeiterfassung → Einstellungen → Gruppe eintragen
+                                            @endif
                                         </div>
                                     </td>
                                     <td class="px-2 py-1.5"><input type="checkbox" name="personen[{{ $p->id }}][aushilfe]" value="1" @checked($p->pivot->aushilfe) class="rounded border-gray-300 text-indigo-600"></td>
-                                    <td class="px-2 py-1.5"><input type="text" name="personen[{{ $p->id }}][wochenstunden]" value="{{ $dauer($p->pivot->wochenstunden) }}" placeholder="{{ $m ? $dauer($m->wochenMinuten()) : '' }}" class="w-24 rounded-lg border-gray-300 text-sm"></td>
+                                    <td class="px-2 py-1.5"><input type="text" name="personen[{{ $p->id }}][wochenstunden]" value="{{ $dauer($p->pivot->wochenstunden) }}" placeholder="{{ $m ? 'alle ('.$dauer($m->wochenMinuten()).')' : '' }}" class="w-24 rounded-lg border-gray-300 text-sm"></td>
                                     <td class="px-2 py-1.5"><input type="text" name="personen[{{ $p->id }}][max_monat]" value="{{ $dauer($p->pivot->max_monat) }}" placeholder="unbegrenzt" class="w-24 rounded-lg border-gray-300 text-sm"></td>
                                     <td class="px-2 py-1.5"><input type="number" min="1" max="6" name="personen[{{ $p->id }}][max_tage_woche]" value="{{ $p->pivot->max_tage_woche }}" placeholder="{{ $m?->arbeitstageJeWoche() ?: 5 }}" class="w-20 rounded-lg border-gray-300 text-sm"></td>
                                     <td class="px-2 py-1.5">
@@ -190,25 +195,6 @@
 
         {{-- Stammdaten + Feiertage --}}
         <div class="space-y-4">
-            <div class="rounded-xl border border-gray-200 bg-white p-5">
-                <h2 class="text-base font-semibold text-gray-800">Kernarbeitszeit</h2>
-                <p class="mt-1 text-sm text-gray-500">
-                    Für den automatischen Vorschlag: Schichten der Stammkräfte decken die Kernarbeitszeit ganz ab (kürzere Schichten liegen
-                    ganz darin). Leer = keine Vorgabe. Von Hand lässt sich jederzeit abweichen.
-                </p>
-                <form method="POST" action="{{ route('module.zeiterfassung.dienstplan.abteilung.kernzeiten', $abteilung) }}" class="mt-3">
-                    @csrf
-                    <div class="grid grid-cols-[3rem_1fr_1fr] items-center gap-2 text-sm">
-                        @foreach ($tageNamen as $nr => $name)
-                            @php $k = ($abteilung->kernzeiten ?? [])[$nr] ?? []; @endphp
-                            <span class="font-medium text-gray-700">{{ $name }}</span>
-                            <input type="time" name="kern[{{ $nr }}][von]" value="{{ $k['von'] ?? '' }}" step="900" class="rounded-lg border-gray-300 text-sm" aria-label="{{ $name }} von">
-                            <input type="time" name="kern[{{ $nr }}][bis]" value="{{ $k['bis'] ?? '' }}" step="900" class="rounded-lg border-gray-300 text-sm" aria-label="{{ $name }} bis">
-                        @endforeach
-                    </div>
-                    <div class="mt-3 flex justify-end">
-                        <button type="submit" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">Kernarbeitszeit speichern</button>
-                    </div>
                 </form>
             </div>
 
