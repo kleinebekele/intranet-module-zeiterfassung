@@ -74,141 +74,180 @@
         @else
             @if ($planer && ! $plan)
                 <p class="border-b border-gray-200 px-4 py-2 text-sm text-gray-500">
-                    Noch kein Plan für diesen Monat: „Vorschlag erstellen" oder Zellen anklicken und von Hand eintragen.
+                    Noch kein Plan für diesen Monat: „Vorschlag erstellen" oder mit + von Hand eintragen.
                 </p>
             @endif
             @php
                 $dauer = fn ($m) => \Intranet\Modules\Zeiterfassung\Support\Format::dauer((int) $m);
-                $kw = [];
-                $start = null;
-                foreach ($tage as $d => $t) {
-                    $start ??= $d;
-                    if (in_array($d, $wochenEnde, true)) {
-                        $kw[] = ['nr' => $t['datum']->isoWeek, 'tage' => count(array_filter(array_keys($tage), fn ($x) => $x >= $start && $x <= $d)) + 1];
-                        $start = null;
-                    }
+                $vz = fn ($m) => \Intranet\Modules\Zeiterfassung\Support\Format::dauer((int) $m, true);
+                // Feste Farbe je Person (vollständige Klassennamen, damit Tailwind sie findet).
+                $farben = [
+                    'bg-indigo-100 text-indigo-900', 'bg-emerald-100 text-emerald-900', 'bg-rose-100 text-rose-900',
+                    'bg-sky-100 text-sky-900', 'bg-violet-100 text-violet-900', 'bg-teal-100 text-teal-900',
+                    'bg-orange-100 text-orange-900', 'bg-lime-100 text-lime-900',
+                ];
+                $farbe = [];
+                foreach (array_keys($personen) as $nr => $uid) {
+                    $farbe[$uid] = $farben[$nr % count($farben)];
                 }
+                $kurz = fn ($name) => \Illuminate\Support\Str::of($name)->explode(' ')->first();
             @endphp
-            <div class="overflow-x-auto">
-                <table class="w-full border-collapse text-xs">
-                    <thead>
-                        <tr class="bg-gray-50 text-gray-500">
-                            <th class="sticky left-0 z-10 bg-gray-50 px-3 pt-2"></th>
-                            @foreach ($kw as $w)
-                                <th colspan="{{ $w['tage'] }}" class="border-l border-gray-200 px-1 pt-2 text-left text-[11px] font-semibold text-gray-600">KW {{ $w['nr'] }}</th>
-                            @endforeach
-                            <th colspan="2"></th>
-                        </tr>
-                        <tr class="border-b border-gray-200 bg-gray-50 text-gray-500">
-                            <th class="sticky left-0 z-10 bg-gray-50 px-3 py-2 text-left font-semibold">Person</th>
-                            @foreach ($tage as $d => $t)
-                                <th class="min-w-12 px-0.5 py-2 text-center font-normal {{ $t['offen'] ? '' : 'text-gray-300' }} {{ $t['datum']->isToday() ? 'font-bold text-indigo-600' : '' }} {{ $t['datum']->dayOfWeekIso === 1 || $loop->first ? 'border-l border-gray-200' : '' }}"
-                                    title="{{ $t['hinweis'] }}">
-                                    {{ $t['datum']->isoFormat('dd') }}<br>{{ $t['datum']->day }}
-                                    @if ($t['hinweis'])<div class="truncate text-[9px] {{ $t['offen'] ? 'text-indigo-500' : 'text-red-400' }}">{{ mb_substr($t['hinweis'], 0, 6) }}</div>@endif
-                                </th>
-                                @if (in_array($d, $wochenEnde, true))
-                                    <th class="min-w-14 bg-gray-100 px-1 py-2 text-center font-semibold text-gray-600">Σ KW<br>{{ $t['datum']->isoWeek }}</th>
-                                @endif
-                            @endforeach
-                            <th class="px-2 py-2 text-right font-semibold">Monat</th>
-                            <th class="px-2 py-2 text-right font-semibold">Soll</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100">
-                        @foreach ($personen as $uid => $p)
-                            @php $pr = $pruefung['personen'][$uid]; @endphp
-                            <tr class="{{ $uid === $ich ? 'bg-indigo-50/40' : '' }}">
-                                <td class="sticky left-0 z-10 whitespace-nowrap bg-white px-3 py-1.5 text-sm text-gray-800">
-                                    {{ $p['user']->name }}
-                                    @if ($p['aushilfe'])<span class="ml-1 rounded bg-gray-100 px-1 text-[10px] text-gray-500">Aushilfe</span>@endif
-                                </td>
-                                @foreach ($tage as $d => $t)
+
+            {{-- Personen: Farbe, Monat geplant / Soll --}}
+            <div class="flex flex-wrap gap-2 border-b border-gray-200 px-4 py-3">
+                @foreach ($personen as $uid => $p)
+                    @php $pr = $pruefung['personen'][$uid]; $diff = $pr['geplant'] - $pr['ziel']; @endphp
+                    <div class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs {{ $farbe[$uid] }} {{ $uid === $ich ? 'ring-2 ring-indigo-400' : '' }}"
+                         title="{{ $pr['gutschrift'] ? 'Feiertage gutgeschrieben: '.$dauer($pr['gutschrift']).' Std. – sie mindern das Soll.' : '' }}">
+                        <span class="font-semibold">{{ $p['user']->name }}</span>
+                        @if ($p['aushilfe'])
+                            <span>{{ $dauer($pr['geplant']) }}{{ $pr['budget'] !== null ? ' / max. '.$dauer($pr['budget']) : '' }} · Aushilfe</span>
+                        @else
+                            <span>{{ $dauer($pr['geplant']) }} / {{ $dauer($pr['ziel']) }}</span>
+                            @if (abs($diff) >= 15)
+                                <span class="font-semibold {{ $diff > 0 ? 'text-amber-700' : 'text-red-600' }}">{{ $vz($diff) }}</span>
+                            @endif
+                            @if ($pr['gutschrift'])<span class="opacity-70">Feiertag −{{ $dauer($pr['gutschrift']) }}</span>@endif
+                        @endif
+                    </div>
+                @endforeach
+            </div>
+
+            <div class="p-2 sm:p-4">
+                {{-- Wochentage (nur breite Bildschirme) --}}
+                <div class="hidden gap-1 pb-1 text-center text-xs font-semibold uppercase tracking-wide text-gray-500 lg:grid lg:grid-cols-[3.5rem_repeat(7,minmax(0,1fr))_9rem]">
+                    <div>KW</div>
+                    @foreach (\Intranet\Modules\Zeiterfassung\Models\Zeitmodell::TAGE as $name)
+                        <div>{{ $name }}</div>
+                    @endforeach
+                    <div>Summe</div>
+                </div>
+
+                <div class="space-y-3 lg:space-y-1">
+                    @foreach ($wochen as $woche)
+                        @php
+                            $ersterTag = $tage[$woche[0]]['datum'];
+                            $ende = end($woche);
+                            $nr = $ersterTag->isoWeek;
+                        @endphp
+                        <div class="rounded-lg border border-gray-200 lg:rounded-none lg:border-0">
+                            <div class="border-b border-gray-200 bg-gray-50 px-3 py-1.5 text-sm font-semibold text-gray-700 lg:hidden">KW {{ $nr }}</div>
+                            <div class="grid grid-cols-1 gap-1 p-1 sm:grid-cols-2 lg:grid-cols-[3.5rem_repeat(7,minmax(0,1fr))_9rem] lg:p-0">
+                                {{-- Kalenderwoche am Wochenanfang (breite Bildschirme; schmal steht sie oben drüber) --}}
+                                <div class="hidden items-start justify-center rounded-md bg-gray-50 pt-1.5 text-sm font-semibold text-gray-600 lg:flex">KW {{ $nr }}</div>
+
+                                {{-- Leere Felder vor dem Monatsersten --}}
+                                @for ($leer = 1; $leer < $ersterTag->dayOfWeekIso; $leer++)
+                                    <div class="hidden rounded-md bg-gray-50/60 lg:block"></div>
+                                @endfor
+
+                                @foreach ($woche as $d)
                                     @php
-                                        $s = $schichten[$uid][$d] ?? null;
-                                        $warn = $pruefung['zellen'][$uid][$d] ?? [];
-                                        $weg = $p['abwesend'][$d] ?? null;
-                                        $ue = $pruefung['ueberstunden'][$uid][$d] ?? 0;
-                                        $titel = implode(' · ', array_filter([$weg, ...$warn, $ue ? 'Überstunden: '.$dauer($ue) : null, $s?->notiz]));
+                                        $t = $tage[$d];
+                                        $pt = $pruefung['tage'][$d];
+                                        $heute = $t['datum']->isToday();
+                                        $hier = collect($personen)->map(fn ($p, $uid) => $schichten[$uid][$d] ?? null)->filter()->sortBy('von');
+                                        $weg = collect($personen)->filter(fn ($p) => isset($p['abwesend'][$d]));
+                                        $fehlt = implode(' · ', array_merge(array_map(fn ($x) => 'Mindestens: '.$x, $pt['fehlt']), array_map(fn ($x) => 'Optional: '.$x, $pt['optional'])));
                                     @endphp
-                                    <td class="px-0.5 py-1 text-center align-top {{ $t['offen'] ? '' : 'bg-gray-50' }} {{ $t['datum']->dayOfWeekIso === 1 || $loop->first ? 'border-l border-gray-200' : '' }}">
-                                        @if ($planer)
-                                            <button type="button"
-                                                    @click="oeffne({{ $uid }}, @js($p['user']->name), '{{ $d }}', @js($t['datum']->isoFormat('dd DD.MM.')), @js($t['datum']->isoFormat('dddd')), '{{ $s?->von }}', '{{ $s?->bis }}', '{{ $s ? $s->pause : '' }}', @js($s?->notiz ?? ''))"
-                                                    title="{{ $titel }}"
-                                                    class="block w-full rounded px-0.5 py-0.5 leading-tight {{ $s ? ($warn ? 'bg-red-100 text-red-800' : ($ue ? 'bg-amber-100 text-amber-800' : 'bg-indigo-100 text-indigo-800')) : ($weg ? 'bg-sky-50 text-sky-700' : 'text-gray-300 hover:bg-gray-100') }}">
-                                                @if ($s){{ $s->von }}<br>{{ $s->bis }}@elseif ($weg){{ mb_substr($weg, 0, 1) }}@else&nbsp;<br>&nbsp;@endif
-                                                @if ($ue)<span class="block text-[9px] font-semibold">Ü +{{ $dauer($ue) }}</span>@endif
-                                            </button>
-                                        @else
-                                            <div title="{{ $titel }}"
-                                                 class="rounded px-0.5 py-0.5 leading-tight {{ $s ? ($ue ? 'bg-amber-100 text-amber-800' : 'bg-indigo-100 text-indigo-800') : ($weg ? 'bg-sky-50 text-sky-700' : '') }}">
-                                                @if ($s){{ $s->von }}<br>{{ $s->bis }}@elseif ($weg){{ mb_substr($weg, 0, 1) }}@endif
-                                                @if ($ue)<span class="block text-[9px] font-semibold">Ü +{{ $dauer($ue) }}</span>@endif
+                                    <div class="flex flex-col rounded-md border p-1.5 lg:min-h-28 {{ $t['offen'] ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50' }} {{ $heute ? 'ring-2 ring-indigo-400' : '' }}">
+                                        <div class="mb-1 flex items-start justify-between gap-1">
+                                            <div class="leading-tight">
+                                                <span class="text-sm font-semibold {{ $t['offen'] ? 'text-gray-800' : 'text-gray-400' }}">{{ $t['datum']->day }}.</span>
+                                                <span class="text-xs text-gray-500 lg:hidden">{{ $t['datum']->isoFormat('dddd') }}</span>
+                                                @if ($t['hinweis'])
+                                                    <div class="text-[11px] {{ $t['offen'] ? 'text-indigo-600' : 'text-red-500' }}">{{ $t['hinweis'] }}</div>
+                                                @elseif (! $t['offen'])
+                                                    <div class="text-[11px] text-gray-400">geschlossen</div>
+                                                @endif
+                                            </div>
+                                            @if ($t['offen'])
+                                                <span title="{{ $fehlt ?: 'besetzt' }}">
+                                                    @if ($pt['fehlt'])
+                                                        <span class="inline-block rounded bg-red-500 px-1.5 text-[11px] font-bold text-white">!</span>
+                                                    @elseif ($pt['optional'])
+                                                        <span class="inline-block rounded bg-amber-300 px-1.5 text-[11px] text-white">~</span>
+                                                    @else
+                                                        <span class="text-sm text-green-600">✓</span>
+                                                    @endif
+                                                </span>
+                                            @endif
+                                        </div>
+
+                                        <div class="flex flex-1 flex-col gap-1">
+                                            @foreach ($hier as $uid => $s)
+                                                @php
+                                                    $p = $personen[$uid];
+                                                    $warn = $pruefung['zellen'][$uid][$d] ?? [];
+                                                    $ue = $pruefung['ueberstunden'][$uid][$d] ?? 0;
+                                                    $titel = implode(' · ', array_filter([$p['user']->name.' '.$s->von.'–'.$s->bis.($s->pause ? ', Pause '.$s->pause.' Min.' : ''), ...$warn, $ue ? 'Überstunden: '.$dauer($ue) : null, $s->notiz]));
+                                                @endphp
+                                                @if ($planer)
+                                                    <button type="button" title="{{ $titel }}"
+                                                            @click="oeffne({{ $uid }}, @js($p['user']->name), '{{ $d }}', @js($t['datum']->isoFormat('dd DD.MM.')), @js($t['datum']->isoFormat('dddd')), '{{ $s->von }}', '{{ $s->bis }}', '{{ $s->pause }}', @js($s->notiz ?? ''))"
+                                                            class="flex w-full flex-wrap items-center justify-between gap-x-1 rounded px-1.5 py-0.5 text-left text-xs {{ $farbe[$uid] }} {{ $warn ? 'ring-2 ring-red-500' : '' }} {{ $uid === $ich ? 'font-semibold' : '' }}">
+                                                        <span class="truncate">{{ $kurz($p['user']->name) }}</span>
+                                                        <span class="whitespace-nowrap">{{ $s->von }}–{{ $s->bis }}</span>
+                                                        @if ($ue)<span class="basis-full text-right"><span class="rounded bg-amber-400 px-1 text-[10px] font-bold text-white">Ü +{{ $dauer($ue) }}</span></span>@endif
+                                                    </button>
+                                                @else
+                                                    <div title="{{ $titel }}"
+                                                         class="flex flex-wrap items-center justify-between gap-x-1 rounded px-1.5 py-0.5 text-xs {{ $farbe[$uid] }} {{ $uid === $ich ? 'font-semibold' : '' }}">
+                                                        <span class="truncate">{{ $kurz($p['user']->name) }}</span>
+                                                        <span class="whitespace-nowrap">{{ $s->von }}–{{ $s->bis }}</span>
+                                                        @if ($ue)<span class="basis-full text-right"><span class="rounded bg-amber-400 px-1 text-[10px] font-bold text-white">Ü +{{ $dauer($ue) }}</span></span>@endif
+                                                    </div>
+                                                @endif
+                                            @endforeach
+                                            @foreach ($weg as $uid => $p)
+                                                <div class="truncate rounded bg-sky-50 px-1.5 py-0.5 text-[11px] text-sky-700" title="{{ $p['abwesend'][$d] }}">
+                                                    {{ $kurz($p['user']->name) }}: {{ $p['abwesend'][$d] }}
+                                                </div>
+                                            @endforeach
+                                            @if ($planer)
+                                                <button type="button" @click="neu('{{ $d }}', @js($t['datum']->isoFormat('dd DD.MM.')), @js($t['datum']->isoFormat('dddd')))"
+                                                        class="mt-auto self-start rounded px-1.5 text-sm leading-5 text-gray-400 hover:bg-gray-100 hover:text-indigo-600" title="Schicht eintragen">+</button>
+                                            @endif
+                                        </div>
+                                    </div>
+                                @endforeach
+
+                                {{-- Leere Felder nach dem Monatsletzten --}}
+                                @for ($leer = $tage[$ende]['datum']->dayOfWeekIso; $leer < 7; $leer++)
+                                    <div class="hidden rounded-md bg-gray-50/60 lg:block"></div>
+                                @endfor
+
+                                {{-- Wochensumme: Plan / Soll je Person --}}
+                                <div class="rounded-md bg-gray-100 p-1.5 text-xs sm:col-span-2 lg:col-span-1">
+                                    <div class="mb-1 font-semibold text-gray-700">Summe</div>
+                                    @foreach ($personen as $uid => $p)
+                                        @php $w = $pruefung['wochen'][$uid][$ende] ?? ['ist' => 0, 'soll' => 0]; $diff = $w['ist'] - $w['soll']; @endphp
+                                        @if ($w['ist'] || $w['soll'])
+                                            <div class="py-0.5 leading-tight">
+                                                <div class="truncate text-gray-600">{{ $p['user']->name }}</div>
+                                                <div class="whitespace-nowrap text-gray-800">
+                                                    {{ $dauer($w['ist']) }}@if (! $p['aushilfe'])<span class="text-gray-500"> / {{ $dauer($w['soll']) }}</span>@endif
+                                                    @if (! $p['aushilfe'] && abs($diff) >= 15)
+                                                        <span class="font-semibold {{ $diff > 0 ? 'text-amber-700' : 'text-red-600' }}">{{ $vz($diff) }}</span>
+                                                    @endif
+                                                </div>
                                             </div>
                                         @endif
-                                    </td>
-                                    @if (in_array($d, $wochenEnde, true))
-                                        @php $w = $pruefung['wochen'][$uid][$d] ?? ['ist' => 0, 'soll' => 0]; $diff = $w['ist'] - $w['soll']; @endphp
-                                        <td class="whitespace-nowrap bg-gray-100 px-1 py-1 text-center align-top leading-tight"
-                                            title="Plan {{ $dauer($w['ist']) }} · Soll {{ $dauer($w['soll']) }}">
-                                            <span class="font-semibold text-gray-800">{{ $dauer($w['ist']) }}</span>
-                                            @if (! $p['aushilfe'])
-                                                <br><span class="text-gray-500">/ {{ $dauer($w['soll']) }}</span>
-                                                @if (abs($diff) >= 15)
-                                                    <br><span class="font-semibold {{ $diff > 0 ? 'text-amber-700' : 'text-red-600' }}">{{ \Intranet\Modules\Zeiterfassung\Support\Format::dauer($diff, true) }}</span>
-                                                @endif
-                                            @endif
-                                        </td>
-                                    @endif
-                                @endforeach
-                                <td class="whitespace-nowrap px-2 py-1.5 text-right text-sm text-gray-800">{{ $dauer($pr['geplant']) }}</td>
-                                <td class="whitespace-nowrap px-2 py-1.5 text-right text-sm text-gray-500"
-                                    title="{{ $pr['gutschrift'] ? 'Feiertage gutgeschrieben: '.$dauer($pr['gutschrift']).' Std. – sie mindern das Soll.' : '' }}">
-                                    @if ($p['aushilfe'])
-                                        {{ $pr['budget'] !== null ? 'max. '.$dauer($pr['budget']) : '–' }}
-                                    @else
-                                        {{ $dauer($pr['ziel']) }}
-                                        @if ($pr['gutschrift'])<div class="text-[10px] text-gray-400">Feiertag −{{ $dauer($pr['gutschrift']) }}</div>@endif
-                                        @if (abs($pr['geplant'] - $pr['ziel']) >= 15)
-                                            <div class="text-xs {{ $pr['geplant'] > $pr['ziel'] ? 'text-amber-700' : 'text-red-600' }}">{{ \Intranet\Modules\Zeiterfassung\Support\Format::dauer($pr['geplant'] - $pr['ziel'], true) }}</div>
-                                        @endif
-                                    @endif
-                                </td>
-                            </tr>
-                        @endforeach
-                        <tr class="border-t-2 border-gray-200 bg-gray-50">
-                            <td class="sticky left-0 z-10 bg-gray-50 px-3 py-1.5 text-sm font-semibold text-gray-700">Besetzung</td>
-                            @foreach ($tage as $d => $t)
-                                @php $pt = $pruefung['tage'][$d]; @endphp
-                                <td class="px-0.5 py-1 text-center {{ $t['datum']->dayOfWeekIso === 1 || $loop->first ? 'border-l border-gray-200' : '' }}" title="{{ implode(' · ', array_merge(array_map(fn ($x) => 'Mindestens: '.$x, $pt['fehlt']), array_map(fn ($x) => 'Optional: '.$x, $pt['optional']))) }}">
-                                    @if ($t['offen'])
-                                        @if ($pt['fehlt'])
-                                            <span class="inline-block rounded bg-red-500 px-1 text-[10px] font-bold text-white">!</span>
-                                        @elseif ($pt['optional'])
-                                            <span class="inline-block rounded bg-amber-300 px-1 text-[10px] text-white">~</span>
-                                        @else
-                                            <span class="text-green-600">✓</span>
-                                        @endif
-                                    @endif
-                                </td>
-                                @if (in_array($d, $wochenEnde, true))
-                                    <td class="bg-gray-100"></td>
-                                @endif
-                            @endforeach
-                            <td colspan="2"></td>
-                        </tr>
-                    </tbody>
-                </table>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
             </div>
+
             <div class="flex flex-wrap gap-4 border-t border-gray-200 px-4 py-2 text-xs text-gray-500">
                 <span><span class="text-green-600">✓</span> besetzt</span>
                 <span><span class="inline-block rounded bg-amber-300 px-1 text-white">~</span> optionale Besetzung fehlt</span>
                 <span><span class="inline-block rounded bg-red-500 px-1 font-bold text-white">!</span> unter Mindestbesetzung</span>
-                <span><span class="inline-block rounded bg-amber-100 px-1 text-amber-800">Ü</span> Überstunden der Woche</span>
-                <span><span class="inline-block rounded bg-sky-50 px-1 text-sky-700">U</span> abwesend</span>
-                <span>Σ KW = Plan / Soll der Woche (Feiertage und Abwesenheit gutgeschrieben)</span>
-                @if ($planer)<span>Zelle anklicken zum Ändern</span>@endif
+                <span><span class="inline-block rounded bg-amber-400 px-1 font-bold text-white">Ü</span> Überstunden der Woche</span>
+                <span>Σ = Plan / Soll der Woche (Feiertage und Abwesenheit gutgeschrieben)</span>
+                @if ($planer)<span>Schicht anklicken zum Ändern, + zum Eintragen</span>@endif
             </div>
         @endif
 
@@ -216,10 +255,21 @@
             {{-- Dialog: Schicht eintragen / ändern / entfernen --}}
             <div x-show="offen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @keydown.escape.window="offen = false">
                 <div class="w-full max-w-md rounded-xl bg-white p-5 shadow-xl" @click.outside="offen = false">
-                    <h3 class="text-base font-semibold text-gray-800"><span x-text="name"></span> · <span x-text="tag"></span></h3>
+                    <h3 class="text-base font-semibold text-gray-800"><span x-text="vorhanden ? name : 'Neue Schicht'"></span> · <span x-text="tag"></span></h3>
                     <form method="POST" action="{{ route('module.zeiterfassung.dienstplan.schicht', $abteilung) }}" class="mt-4 space-y-3">
                         @csrf
-                        <input type="hidden" name="user_id" :value="user">
+                        <template x-if="vorhanden">
+                            <input type="hidden" name="user_id" :value="user">
+                        </template>
+                        <template x-if="! vorhanden">
+                            <label class="block text-sm"><span class="text-gray-600">Person</span>
+                                <select name="user_id" x-model="user" required class="mt-1 w-full rounded-lg border-gray-300 text-sm">
+                                    <option value="">bitte wählen …</option>
+                                    @foreach ($personen as $uid => $p)
+                                        <option value="{{ $uid }}">{{ $p['user']->name }}{{ $p['aushilfe'] ? ' (Aushilfe)' : '' }}</option>
+                                    @endforeach
+                                </select></label>
+                        </template>
                         <input type="hidden" name="datum" :value="datum">
                         <div class="grid grid-cols-3 gap-3">
                             <label class="block text-sm"><span class="text-gray-600">Von</span>
@@ -281,6 +331,9 @@
                     offen: false, vorhanden: false, alle: false, user: '', name: '', datum: '', tag: '', wochentag: '', von: '', bis: '', pause: '', notiz: '',
                     oeffne(user, name, datum, tag, wochentag, von, bis, pause, notiz) {
                         Object.assign(this, { offen: true, alle: false, vorhanden: !! von, user, name, datum, tag, wochentag, von, bis, pause, notiz });
+                    },
+                    neu(datum, tag, wochentag) {
+                        Object.assign(this, { offen: true, alle: false, vorhanden: false, user: '', name: '', datum, tag, wochentag, von: '', bis: '', pause: '', notiz: '' });
                     },
                     async entfernen(form) {
                         if (this.alle && window.bestaetige && ! await window.bestaetige(

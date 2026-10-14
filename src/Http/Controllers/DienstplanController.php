@@ -62,7 +62,7 @@ class DienstplanController
             'sichtbar' => $sichtbar,
             'planer' => $planer,
             'tage' => $rechner->tage(),
-            'wochenEnde' => array_map(fn ($w) => end($w), $rechner->wochen()),
+            'wochen' => $rechner->wochen(),
             'personen' => $rechner->personen(),
             'schichten' => $schichten->groupBy('user_id')->map(fn ($liste) => $liste->keyBy(fn (Schicht $s) => $s->datum->toDateString())),
             'pruefung' => $sichtbar ? $rechner->pruefen($schichten) : null,
