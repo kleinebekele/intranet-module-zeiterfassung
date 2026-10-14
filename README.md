@@ -57,9 +57,10 @@ das Soll), dem Mitarbeiter fehlt dadurch nichts. Geplant wird je Kalenderwoche:
 4. **Aushilfen** (je Abteilung einstellbar): immer ihre volle Zeit (Monatsbudget bzw. Wochenstunden) dort, wo am
    wenigsten los ist – oder nur bei Lücken.
 
-**Sollzeit und Kernarbeitszeit** je Person stehen im Zeitmodell (Einstellungen → Gruppe); automatisch geplante
-Schichten der Stammkräfte decken die Kernarbeitszeit ab. In der Abteilung lässt sich festlegen, wie viele Stunden der
-Sollzeit dort zur Verfügung stehen (leer = alle).
+**Sollzeit** je Person = Wochenstunden (Einstellungen → Gruppe). Die Tage mit **Kernarbeitszeit** sind die
+Arbeitstage, auf sie verteilt die Zeiterfassung die Wochenstunden (ohne Kernzeit: Mo–Fr). Für den Dienstplan ist die
+Kernzeit eine Orientierung: bevorzugte Tage, und Schichten decken sie möglichst zu 80 % ab. In der Abteilung lässt
+sich festlegen, wie viele Stunden der Sollzeit dort zur Verfügung stehen (leer = alle).
 
 Gleich gute Möglichkeiten entscheidet das Los – „Neu vorschlagen" liefert jedes Mal eine andere Variante.
 Ruhezeit, Tageshöchstzeit und Pausen aus den Einstellungen gelten immer; beantragter Urlaub blockiert wie genehmigter.

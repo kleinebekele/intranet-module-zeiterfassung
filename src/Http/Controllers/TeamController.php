@@ -129,8 +129,7 @@ class TeamController
 
         $data = $request->validate([
             'gueltig_ab' => ['required', 'date_format:Y-m-d'],
-            'soll' => ['required', 'array'],
-            'soll.*' => ['nullable', 'string', 'max:6'],
+            'wochenstunden' => ['required', 'string', 'max:8'],
             'urlaubstage' => ['required', 'numeric', 'min:0', 'max:99'],
             'bundesland' => ['nullable', 'in:'.implode(',', array_keys(Feiertage::LAENDER))],
             'notiz' => ['nullable', 'string', 'max:500'],
@@ -151,14 +150,15 @@ class TeamController
             $kern[(int) $t] = ['von' => $k['von'], 'bis' => $k['bis']];
         }
 
-        $werte = [];
-        foreach (array_keys(Zeitmodell::TAGE) as $t) {
-            $min = Format::minutenAus($data['soll'][$t] ?? '');
-            if ($min === null || $min > 24 * 60) {
-                return back()->withInput()->with('error', 'Sollzeit für '.Zeitmodell::TAGE[$t].' bitte als 7:30 oder 7,5 angeben.');
-            }
-            $werte["soll_{$t}"] = $min;
+        // Sollzeit = Wochenstunden. Die Zeiterfassung rechnet je Tag: verteilt auf die Tage mit
+        // Kernarbeitszeit (das sind die Arbeitstage), ohne Kernzeit auf Mo–Fr.
+        $woche = Format::minutenAus($data['wochenstunden']);
+        if ($woche === null || $woche > 7 * 24 * 60) {
+            return back()->withInput()->with('error', 'Wochenstunden bitte als 40, 38,5 oder 38:30 angeben.');
         }
+        $tage = $kern ? array_keys($kern) : [1, 2, 3, 4, 5];
+        sort($tage);
+        $werte = Zeitmodell::verteile($woche, $tage);
 
         // whereDate: das Datum liegt je nach Datenbank mit Uhrzeit 00:00:00 vor.
         $modell = Zeitmodell::where('user_id', $person->id)->whereDate('gueltig_ab', $data['gueltig_ab'])->first()

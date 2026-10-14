@@ -33,7 +33,7 @@ use Intranet\Modules\Zeiterfassung\Models\Zeitmodell;
  *     mit Aushilfen-Budget.
  *  4. Aushilfen (einstellbar je Abteilung): ihre volle Zeit, dort wo am wenigsten los ist –
  *     oder nur Lücken.
- * Kernarbeitszeit je Wochentag: automatisch geplante Schichten der Stammkräfte decken sie ab.
+ * Kernarbeitszeit (Zeitmodell der Person) ist eine Orientierung: bevorzugte Tage und Lage der Schicht.
  *
  * Gleich gute Möglichkeiten entscheidet das Los: „Neu vorschlagen" liefert jedes Mal eine
  * andere Variante.
@@ -396,6 +396,10 @@ class Planer
                         continue;
                     }
                     $wert = $bedarf[$datum] - $kapazitaet[$datum];
+                    // Orientierung: Arbeitstage laut Zeitmodell (Tage mit Kernzeit) bevorzugen.
+                    if (($this->personen[$uid]['sollTag'][$datum] ?? 0) > 0) {
+                        $wert += 400;
+                    }
                     if ($t['datum']->dayOfWeekIso === 6 && $this->samstage[$uid] > min($this->samstage)) {
                         $wert -= 10000;
                     }
@@ -491,12 +495,12 @@ class Planer
             return;
         }
 
-        // Kernarbeitszeit: die Schicht deckt sie ganz ab (bzw. liegt ganz darin, wenn sie kürzer ist).
+        // Kernarbeitszeit ist eine Orientierung: bevorzugt Lagen, die sie zu mindestens 80 % abdecken
+        // (bzw. kürzere Schichten zu 80 % darin) – gibt es keine, gilt sie nicht.
         if ($kern = $this->kernAm($uid, $t)) {
             [$kv, $kb] = $kern;
-            $passend = array_values(array_filter($kandidaten, fn ($s) => $laenge >= $kb - $kv
-                ? $s <= $kv && $s + $laenge >= $kb
-                : $s >= $kv && $s + $laenge <= $kb));
+            $soll = 0.8 * min($laenge, $kb - $kv);
+            $passend = array_values(array_filter($kandidaten, fn ($s) => min($s + $laenge, $kb) - max($s, $kv) >= $soll));
             if ($passend) {
                 $kandidaten = $passend;
             }

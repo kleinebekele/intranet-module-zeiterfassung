@@ -29,6 +29,27 @@ class Zeitmodell extends Model
         ];
     }
 
+    /**
+     * Wochenstunden gleichmäßig auf die Arbeitstage verteilen; Restminuten bekommen die ersten Tage.
+     *
+     * @param  list<int>  $tage  Wochentage 1–7
+     * @return array<string, int> soll_1 … soll_7
+     */
+    public static function verteile(int $wochenMinuten, array $tage): array
+    {
+        $werte = [];
+        $n = max(1, count($tage));
+        $rest = $wochenMinuten % $n;
+        foreach (array_keys(self::TAGE) as $t) {
+            $werte["soll_{$t}"] = 0;
+        }
+        foreach (array_values($tage) as $i => $t) {
+            $werte["soll_{$t}"] = intdiv($wochenMinuten, $n) + ($i < $rest ? 1 : 0);
+        }
+
+        return $werte;
+    }
+
     /** Kernarbeitszeit eines Wochentags als [von, bis] in Minuten – oder null. */
     public function kernFuer(int $isoWochentag): ?array
     {
