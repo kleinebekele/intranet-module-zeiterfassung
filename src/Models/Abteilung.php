@@ -18,6 +18,14 @@ class Abteilung extends Model
 
     protected $guarded = ['id'];
 
+    protected function casts(): array
+    {
+        return [
+            'kernzeiten' => 'array',
+            'aushilfen_voll' => 'boolean',
+        ];
+    }
+
     public function personen(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'zeit_abteilung_personen', 'abteilung_id', 'user_id')

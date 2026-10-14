@@ -56,6 +56,7 @@ class AbteilungController
             'bundesland' => ['nullable', 'in:'.implode(',', array_keys(Feiertage::LAENDER))],
             'min_schicht' => ['required', 'string'],
             'notiz' => ['nullable', 'string', 'max:500'],
+            'aushilfen_voll' => ['required', 'boolean'],
         ]);
 
         $min = Format::minutenAus($data['min_schicht']);
@@ -63,9 +64,35 @@ class AbteilungController
             return back()->withInput()->with('error', 'Kürzeste Schicht bitte als 3:00 oder 3 angeben.');
         }
 
-        $abteilung->update(['name' => $data['name'], 'bundesland' => $data['bundesland'] ?: null, 'min_schicht' => $min, 'notiz' => $data['notiz']]);
+        $abteilung->update(['name' => $data['name'], 'bundesland' => $data['bundesland'] ?: null, 'min_schicht' => $min, 'notiz' => $data['notiz'], 'aushilfen_voll' => (bool) $data['aushilfen_voll']]);
 
         return back()->with('status', 'Abteilung gespeichert.');
+    }
+
+    /** Kernarbeitszeit je Wochentag (leer = keine) – gilt für den automatischen Vorschlag. */
+    public function kernzeiten(Request $request, Abteilung $abteilung)
+    {
+        $this->darf($request);
+        $data = $request->validate([
+            'kern' => ['nullable', 'array'],
+            'kern.*.von' => ['nullable', 'date_format:H:i'],
+            'kern.*.bis' => ['nullable', 'date_format:H:i'],
+        ]);
+
+        $kern = [];
+        foreach ($data['kern'] ?? [] as $tag => $k) {
+            if (empty($k['von']) && empty($k['bis'])) {
+                continue;
+            }
+            if (empty($k['von']) || empty($k['bis']) || $k['von'] >= $k['bis'] || (int) $tag < 1 || (int) $tag > 7) {
+                return back()->withInput()->with('error', 'Kernarbeitszeit: bitte je Tag Beginn und Ende angeben (Ende nach Beginn) oder beides leer lassen.');
+            }
+            $kern[(int) $tag] = ['von' => $k['von'], 'bis' => $k['bis']];
+        }
+
+        $abteilung->update(['kernzeiten' => $kern ?: null]);
+
+        return back()->with('status', 'Kernarbeitszeit gespeichert.');
     }
 
     /** Alle Zeitfenster auf einmal: vorhandene ändern/löschen, neues für mehrere Wochentage anlegen. */

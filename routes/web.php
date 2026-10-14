@@ -64,6 +64,7 @@ Route::middleware(['web', 'auth'])
         Route::post('dienstplan/{abteilung}/status', [DienstplanController::class, 'status'])->name('dienstplan.status');
         Route::get('dienstplan/{abteilung}/abteilung', [AbteilungController::class, 'bearbeiten'])->name('dienstplan.abteilung');
         Route::post('dienstplan/{abteilung}/abteilung', [AbteilungController::class, 'speichern'])->name('dienstplan.abteilung.speichern');
+        Route::post('dienstplan/{abteilung}/kernzeiten', [AbteilungController::class, 'kernzeiten'])->name('dienstplan.abteilung.kernzeiten');
         Route::post('dienstplan/{abteilung}/besetzung', [AbteilungController::class, 'besetzung'])->name('dienstplan.abteilung.besetzung');
         Route::post('dienstplan/{abteilung}/personen', [AbteilungController::class, 'personen'])->name('dienstplan.abteilung.personen');
         Route::post('dienstplan/{abteilung}/sondertage', [AbteilungController::class, 'sondertag'])->name('dienstplan.abteilung.sondertag');

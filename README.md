@@ -54,6 +54,12 @@ das Soll), dem Mitarbeiter fehlt dadurch nichts. Geplant wird je Kalenderwoche:
    ihrem freien Tag. Was über das Wochensoll geht, wird als Überstunden markiert. Optionale Besetzung nur mit
    Aushilfen-Budget.
 
+4. **Aushilfen** (je Abteilung einstellbar): immer ihre volle Zeit (Monatsbudget bzw. Wochenstunden) dort, wo am
+   wenigsten los ist – oder nur bei Lücken.
+
+**Kernarbeitszeit** je Wochentag (Einstellungen der Abteilung): automatisch geplante Schichten der Stammkräfte decken
+sie ganz ab.
+
 Gleich gute Möglichkeiten entscheidet das Los – „Neu vorschlagen" liefert jedes Mal eine andere Variante.
 Ruhezeit, Tageshöchstzeit und Pausen aus den Einstellungen gelten immer; beantragter Urlaub blockiert wie genehmigter.
 Von Hand: Zelle anklicken, optional für alle gleichen Wochentage des Monats. Je Woche zeigt „Σ KW" Plan und Soll.

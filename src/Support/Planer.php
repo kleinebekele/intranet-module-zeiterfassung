@@ -31,6 +31,9 @@ use Intranet\Modules\Zeiterfassung\Models\Zeitmodell;
  *     sonst Aushilfe im Budget, sonst Stammkraft an ihrem freien Tag. Was über das
  *     Wochensoll geht, markiert die Prüfung als Überstunden. Optionale Besetzung nur
  *     mit Aushilfen-Budget.
+ *  4. Aushilfen (einstellbar je Abteilung): ihre volle Zeit, dort wo am wenigsten los ist –
+ *     oder nur Lücken.
+ * Kernarbeitszeit je Wochentag: automatisch geplante Schichten der Stammkräfte decken sie ab.
  *
  * Gleich gute Möglichkeiten entscheidet das Los: „Neu vorschlagen" liefert jedes Mal eine
  * andere Variante.
@@ -64,6 +67,9 @@ class Planer
 
     private int $maxTag;
 
+    /** @var array<int, array{von: string, bis: string}> Kernarbeitszeit je Wochentag (1 = Montag) */
+    private array $kern = [];
+
     public Carbon $bis;
 
     public function __construct(public Abteilung $abteilung, public Carbon $monat)
@@ -72,6 +78,7 @@ class Planer
         $this->bis = $this->monat->copy()->endOfMonth()->startOfDay();
         $this->ruhezeit = Einstellungen::int('ruhezeit');
         $this->maxTag = Einstellungen::int('max_tag');
+        $this->kern = $abteilung->kernzeiten ?? [];
 
         $this->besetzung = $abteilung->besetzung()->get();
         $this->sondertage = $abteilung->sondertage()
@@ -302,6 +309,9 @@ class Planer
         }
         $this->luecken('min');
         $this->luecken('wunsch');
+        if ($this->abteilung->aushilfen_voll ?? true) {
+            $this->aushilfenAuffuellen();
+        }
 
         $ergebnis = [];
         foreach ($this->plan as $uid => $tage) {
@@ -481,6 +491,17 @@ class Planer
             return;
         }
 
+        // Kernarbeitszeit: die Schicht deckt sie ganz ab (bzw. liegt ganz darin, wenn sie kürzer ist).
+        if ($kern = $this->kernAm($t)) {
+            [$kv, $kb] = $kern;
+            $passend = array_values(array_filter($kandidaten, fn ($s) => $laenge >= $kb - $kv
+                ? $s <= $kv && $s + $laenge >= $kb
+                : $s >= $kv && $s + $laenge <= $kb));
+            if ($passend) {
+                $kandidaten = $passend;
+            }
+        }
+
         $start = match ($rolle) {
             'frueh' => $kandidaten[0],
             'spaet' => $kandidaten[count($kandidaten) - 1],
@@ -565,6 +586,93 @@ class Planer
                 $this->eintragen($uid, $t, $start, $start + $laenge);
             }
         }
+    }
+
+    /**
+     * Schritt 4: Aushilfen bekommen ihre volle Arbeitszeit (Monatsbudget, sonst Wochenstunden) –
+     * dort, wo am meisten optionale Besetzung fehlt bzw. am wenigsten Leute da sind, gleichmäßig
+     * über die Wochen. Von Hand lässt sich danach jederzeit wegstreichen.
+     */
+    private function aushilfenAuffuellen(): void
+    {
+        $minSchicht = max(self::RASTER, (int) $this->abteilung->min_schicht);
+
+        foreach ($this->personen as $uid => $p) {
+            if (! $p['aushilfe'] || $p['ohneStunden']) {
+                continue;
+            }
+            $ziel = $p['budget'] ?? ($p['wochen'] > 0 ? (int) round($p['wochen'] * count($this->tage) / 7) : 0);
+
+            for ($runde = 0; $runde < 62; $runde++) {
+                $rest = $ziel - $this->geplant($uid);
+                if ($rest < min($minSchicht, 60)) {
+                    break;
+                }
+                // Schichten bis 6 Std. (ohne Pause); ein kleiner Rest wird an die letzte Schicht gehängt.
+                $arbeit = min($rest, 360);
+                if ($rest - $arbeit > 0 && $rest - $arbeit < $minSchicht && $rest <= $this->maxTag) {
+                    $arbeit = $rest;
+                }
+                $arbeit = intdiv($arbeit, self::RASTER) * self::RASTER;
+
+                $wahl = null;
+                foreach ($this->tage as $datum => $t) {
+                    $i = $this->index($t['datum']);
+                    if (! $t['offen'] || isset($this->plan[$uid][$i]) || ! $this->frei($uid, $t['datum'])
+                        || $this->wochenTage($uid, $t['datum']) >= $p['tageWoche'] || $this->amStueck($uid, $t['datum']) > 6) {
+                        continue;
+                    }
+                    $laenge = min(self::anwesenheitFuer($arbeit), $t['ende'] - $t['start']);
+                    $wochenMinuten = $this->wochenMinuten($uid, $t['datum']);
+                    for ($start = $t['start']; $start + $laenge <= $t['ende']; $start += self::RASTER) {
+                        if (! $this->ruheOk($uid, $i, $start, $start + $laenge)) {
+                            continue;
+                        }
+                        $wert = mt_rand(0, 20) - intdiv($wochenMinuten, 3);
+                        for ($m = $start; $m < $start + $laenge; $m += self::RASTER) {
+                            if ($s = $t['slots'][$m] ?? null) {
+                                $ist = $this->abdeckung[$datum][$m];
+                                $wert += $ist < $s['wunsch'] ? 40 : intdiv(10, $ist + 1);
+                            }
+                        }
+                        if ($wahl === null || $wert > $wahl[0]) {
+                            $wahl = [$wert, $t, $start, $start + $laenge];
+                        }
+                    }
+                }
+                if ($wahl === null) {
+                    break;
+                }
+                $this->eintragen($uid, $wahl[1], $wahl[2], $wahl[3]);
+            }
+        }
+    }
+
+    /** Geplante Arbeitsminuten der Person in der Kalenderwoche des Tages. */
+    private function wochenMinuten(int $uid, Carbon $tag): int
+    {
+        $i = $this->index($tag);
+        $summe = 0;
+        for ($j = $i - $tag->dayOfWeekIso + 1; $j <= $i - $tag->dayOfWeekIso + 7; $j++) {
+            if ($s = $this->plan[$uid][$j] ?? null) {
+                $summe += $s['bis'] - $s['von'] - self::pauseFuer($s['bis'] - $s['von']);
+            }
+        }
+
+        return $summe;
+    }
+
+    /** Kernarbeitszeit des Tages, auf die Öffnungszeit beschnitten – oder null. */
+    private function kernAm(array $t): ?array
+    {
+        $k = $this->kern[$t['datum']->dayOfWeekIso] ?? null;
+        if (! $k) {
+            return null;
+        }
+        $von = max($t['start'], self::minute($k['von'] ?? null));
+        $bis = min($t['ende'], self::minute($k['bis'] ?? null));
+
+        return $von < $bis ? [$von, $bis] : null;
     }
 
     /** Eine Schicht desselben Tages, die an die Lücke grenzt, über die Lücke verlängern. */

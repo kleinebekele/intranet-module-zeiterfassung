@@ -191,6 +191,28 @@
         {{-- Stammdaten + Feiertage --}}
         <div class="space-y-4">
             <div class="rounded-xl border border-gray-200 bg-white p-5">
+                <h2 class="text-base font-semibold text-gray-800">Kernarbeitszeit</h2>
+                <p class="mt-1 text-sm text-gray-500">
+                    Für den automatischen Vorschlag: Schichten der Stammkräfte decken die Kernarbeitszeit ganz ab (kürzere Schichten liegen
+                    ganz darin). Leer = keine Vorgabe. Von Hand lässt sich jederzeit abweichen.
+                </p>
+                <form method="POST" action="{{ route('module.zeiterfassung.dienstplan.abteilung.kernzeiten', $abteilung) }}" class="mt-3">
+                    @csrf
+                    <div class="grid grid-cols-[3rem_1fr_1fr] items-center gap-2 text-sm">
+                        @foreach ($tageNamen as $nr => $name)
+                            @php $k = ($abteilung->kernzeiten ?? [])[$nr] ?? []; @endphp
+                            <span class="font-medium text-gray-700">{{ $name }}</span>
+                            <input type="time" name="kern[{{ $nr }}][von]" value="{{ $k['von'] ?? '' }}" step="900" class="rounded-lg border-gray-300 text-sm" aria-label="{{ $name }} von">
+                            <input type="time" name="kern[{{ $nr }}][bis]" value="{{ $k['bis'] ?? '' }}" step="900" class="rounded-lg border-gray-300 text-sm" aria-label="{{ $name }} bis">
+                        @endforeach
+                    </div>
+                    <div class="mt-3 flex justify-end">
+                        <button type="submit" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">Kernarbeitszeit speichern</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="rounded-xl border border-gray-200 bg-white p-5">
                 <h2 class="text-base font-semibold text-gray-800">Allgemein</h2>
                 <form method="POST" action="{{ route('module.zeiterfassung.dienstplan.abteilung.speichern', $abteilung) }}" class="mt-3 space-y-3">
                     @csrf
@@ -205,6 +227,11 @@
                         </select></label>
                     <label class="block text-sm"><span class="text-gray-600">Kürzeste Schicht (für Lücken)</span>
                         <input type="text" name="min_schicht" value="{{ $dauer($abteilung->min_schicht) }}" required class="mt-1 w-32 rounded-lg border-gray-300 text-sm"></label>
+                    <fieldset class="text-sm">
+                        <legend class="text-gray-600">Aushilfen im automatischen Vorschlag</legend>
+                        <label class="mt-1 flex items-center gap-2"><input type="radio" name="aushilfen_voll" value="1" @checked($abteilung->aushilfen_voll ?? true) class="border-gray-300 text-indigo-600"> immer ihre volle Zeit (Budget bzw. Wochenstunden)</label>
+                        <label class="mt-1 flex items-center gap-2"><input type="radio" name="aushilfen_voll" value="0" @checked(! ($abteilung->aushilfen_voll ?? true)) class="border-gray-300 text-indigo-600"> nur bei Lücken</label>
+                    </fieldset>
                     <label class="block text-sm"><span class="text-gray-600">Notiz</span>
                         <input type="text" name="notiz" value="{{ $abteilung->notiz }}" maxlength="500" class="mt-1 w-full rounded-lg border-gray-300 text-sm"></label>
                     <div class="flex justify-between">
