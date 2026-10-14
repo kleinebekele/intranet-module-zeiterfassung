@@ -188,9 +188,14 @@ class EinstellungenController
     public function gruppeEntfernen(Request $request, Gruppe $gruppe)
     {
         $this->darf($request);
+        $name = $gruppe->name();
         $gruppe->delete();
+        Rechte::vergessen();
+        Korrektur::audit('zeiterfassung.einstellungen', "Gruppe {$name} entfernt", null);
 
-        return back()->with('status', 'Gruppe entfernt. Die erfassten Zeiten bleiben erhalten.');
+        // Nicht back(): von der Gruppenseite aus gäbe es die Seite danach nicht mehr.
+        return redirect()->route('module.zeiterfassung.einstellungen.index')
+            ->with('status', "Gruppe {$name} entfernt. Die Rolle und die erfassten Zeiten bleiben erhalten.");
     }
 
     public function terminalAnlegen(Request $request)
