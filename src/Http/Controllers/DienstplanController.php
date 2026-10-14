@@ -49,10 +49,11 @@ class DienstplanController
 
         $monat = $this->monat($request);
         $plan = Dienstplan::fuer($abteilung, $monat);
-        $sichtbar = $plan && ($planer || $plan->istVeroeffentlicht());
+        // Planer sehen das Raster immer (auch ohne Plan: dann von Hand eintragen), Mitglieder nur veröffentlicht.
+        $sichtbar = $planer || ($plan && $plan->istVeroeffentlicht());
 
         $rechner = new Planer($abteilung, $monat);
-        $schichten = $sichtbar ? $plan->schichten()->get() : collect();
+        $schichten = $sichtbar && $plan ? $plan->schichten()->get() : collect();
 
         return view('zeiterfassung::dienstplan.zeigen', [
             'abteilung' => $abteilung,
@@ -61,6 +62,7 @@ class DienstplanController
             'sichtbar' => $sichtbar,
             'planer' => $planer,
             'tage' => $rechner->tage(),
+            'wochenEnde' => array_map(fn ($w) => end($w), $rechner->wochen()),
             'personen' => $rechner->personen(),
             'schichten' => $schichten->groupBy('user_id')->map(fn ($liste) => $liste->keyBy(fn (Schicht $s) => $s->datum->toDateString())),
             'pruefung' => $sichtbar ? $rechner->pruefen($schichten) : null,
@@ -94,35 +96,64 @@ class DienstplanController
             'bis' => ['nullable', 'date_format:H:i'],
             'pause' => ['nullable', 'integer', 'min:0', 'max:240'],
             'notiz' => ['nullable', 'string', 'max:200'],
+            'alle' => ['nullable', 'boolean'],
         ]);
         abort_unless($abteilung->personen()->where('users.id', $data['user_id'])->exists(), 404);
 
         $datum = Carbon::parse($data['datum'])->startOfDay();
         $plan = Dienstplan::fuer($abteilung, $datum)
             ?? Dienstplan::create(['abteilung_id' => $abteilung->id, 'monat' => $datum->copy()->startOfMonth(), 'status' => Dienstplan::ENTWURF, 'erstellt_von' => $request->user()->id]);
-        $vorhanden = $plan->schichten()->where('user_id', $data['user_id'])->whereDate('datum', $datum->toDateString())->first();
 
-        if (empty($data['von']) && empty($data['bis'])) {
-            $vorhanden?->delete();
-
-            return back()->with('status', 'Schicht entfernt.');
-        }
-        if (empty($data['von']) || empty($data['bis']) || $data['von'] >= $data['bis']) {
+        $entfernen = empty($data['von']) && empty($data['bis']);
+        if (! $entfernen && (empty($data['von']) || empty($data['bis']) || $data['von'] >= $data['bis'])) {
             return back()->with('error', 'Bitte Beginn und Ende angeben (Ende nach Beginn).');
         }
 
-        $dauer = Planer::minute($data['bis']) - Planer::minute($data['von']);
-        $werte = [
-            'von' => $data['von'],
-            'bis' => $data['bis'],
-            'pause' => $data['pause'] ?? Planer::pauseFuer($dauer),
-            'notiz' => $data['notiz'] ?? null,
-        ];
-        $vorhanden
-            ? $vorhanden->update($werte)
-            : $plan->schichten()->create($werte + ['user_id' => $data['user_id'], 'datum' => $datum]);
+        // Ein Tag oder alle gleichen Wochentage des Monats – geschlossene Tage und Abwesenheiten bleiben frei.
+        $tage = [$datum];
+        $uebersprungen = 0;
+        if ($request->boolean('alle')) {
+            $rechner = new Planer($abteilung, $datum);
+            $abwesend = $rechner->personen()[(int) $data['user_id']]['abwesend'] ?? [];
+            $tage = [];
+            for ($d = $datum->copy()->startOfMonth(); $d->month === $datum->month; $d->addDay()) {
+                if ($d->dayOfWeekIso !== $datum->dayOfWeekIso) {
+                    continue;
+                }
+                if (! $entfernen && (! $rechner->tage()[$d->toDateString()]['offen'] || isset($abwesend[$d->toDateString()]))) {
+                    $uebersprungen++;
 
-        return back()->with('status', 'Schicht gespeichert.');
+                    continue;
+                }
+                $tage[] = $d->copy();
+            }
+        }
+
+        $dauer = $entfernen ? 0 : Planer::minute($data['bis']) - Planer::minute($data['von']);
+        foreach ($tage as $tag) {
+            $vorhanden = $plan->schichten()->where('user_id', $data['user_id'])->whereDate('datum', $tag->toDateString())->first();
+            if ($entfernen) {
+                $vorhanden?->delete();
+
+                continue;
+            }
+            $werte = [
+                'von' => $data['von'],
+                'bis' => $data['bis'],
+                'pause' => $data['pause'] ?? Planer::pauseFuer($dauer),
+                'notiz' => $data['notiz'] ?? null,
+            ];
+            $vorhanden
+                ? $vorhanden->update($werte)
+                : $plan->schichten()->create($werte + ['user_id' => $data['user_id'], 'datum' => $tag]);
+        }
+
+        $text = $entfernen ? 'Schicht entfernt' : 'Schicht gespeichert';
+        if (count($tage) > 1 || $uebersprungen) {
+            $text .= ' ('.count($tage).' Tage'.($uebersprungen ? ", {$uebersprungen} übersprungen: geschlossen oder abwesend" : '').')';
+        }
+
+        return back()->with('status', $text.'.');
     }
 
     public function status(Request $request, Abteilung $abteilung)
@@ -159,6 +190,7 @@ class DienstplanController
             'monat' => $monat,
             'plan' => $plan,
             'tage' => $rechner->tage(),
+            'wochenEnde' => array_map(fn ($w) => end($w), $rechner->wochen()),
             'personen' => $rechner->personen(),
             'schichten' => $schichten->groupBy('user_id')->map(fn ($liste) => $liste->keyBy(fn (Schicht $s) => $s->datum->toDateString())),
             'pruefung' => $rechner->pruefen($schichten),

@@ -43,16 +43,20 @@ Persönliche Codes werden immer zufällig erzeugt (mindestens 6 Ziffern; ältere
 
 ## Dienstplan-Vorschlag
 
-1. **Arbeitstage** der Stammkräfte: so viele, wie das Monatssoll hergibt (Zeitmodell bzw. Wochenstunden; Feiertage und
-   Abwesenheiten zählen nicht), höchstens die Tage je Woche – jeweils dort, wo noch am meisten Bedarf offen ist.
-   So liegen freie Tage versetzt; Samstage rotieren.
-2. **Uhrzeiten**: jede Stammkraft bekommt ihre Tageslänge dort, wo sie die meisten offenen Viertelstunden abdeckt
-   (früh/spät im Wechsel).
-3. **Lücken**: erst die Mindestbesetzung mit Aushilfen (im Budget), notfalls mit freien Stammkräften (Überstunden);
-   danach die optionale Besetzung nur noch mit Aushilfen-Budget.
+Soll je Tag aus dem Zeitmodell bzw. den Wochenstunden. Feiertage und Abwesenheiten werden gutgeschrieben (mindern
+das Soll), dem Mitarbeiter fehlt dadurch nichts. Geplant wird je Kalenderwoche:
 
-Dabei gelten Ruhezeit, Tageshöchstzeit und Pausen aus den Einstellungen, höchstens sechs Tage am Stück. Beantragter
-Urlaub blockiert wie genehmigter. Jede Änderung von Hand wird sofort neu geprüft (Unterbesetzung, Soll, Ruhezeit …).
+1. **Tage und Stunden** der Stammkräfte: das Wochensoll auf so viele Tage, wie die Person je Woche arbeitet – dort,
+   wo am meisten Bedarf offen ist; Samstage reihum. Kurze Tage (Samstag) gleichen längere Tage aus, bis zur
+   Öffnungszeit bzw. Tageshöchstzeit.
+2. **Früh/Spät im Wechsel**: Wer bisher seltener früh war, öffnet; wer seltener spät war, schließt.
+3. **Öffnungszeit immer besetzt**: angrenzende Schicht verlängern, sonst Aushilfe im Budget, sonst Stammkraft an
+   ihrem freien Tag. Was über das Wochensoll geht, wird als Überstunden markiert. Optionale Besetzung nur mit
+   Aushilfen-Budget.
+
+Gleich gute Möglichkeiten entscheidet das Los – „Neu vorschlagen" liefert jedes Mal eine andere Variante.
+Ruhezeit, Tageshöchstzeit und Pausen aus den Einstellungen gelten immer; beantragter Urlaub blockiert wie genehmigter.
+Von Hand: Zelle anklicken, optional für alle gleichen Wochentage des Monats. Je Woche zeigt „Σ KW" Plan und Soll.
 
 ## Aufbewahrung
 

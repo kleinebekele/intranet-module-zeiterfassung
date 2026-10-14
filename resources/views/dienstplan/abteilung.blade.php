@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex flex-wrap items-center justify-between gap-3">
-            <h1 class="text-xl font-semibold text-gray-800">Abteilung {{ $abteilung->name }} einrichten</h1>
+            <h1 class="text-xl font-semibold text-gray-800">Einstellungen zu {{ $abteilung->name }}</h1>
             <a href="{{ route('module.zeiterfassung.dienstplan.zeigen', $abteilung) }}" class="text-sm text-indigo-600 hover:underline">zum Dienstplan</a>
         </div>
     </x-slot>

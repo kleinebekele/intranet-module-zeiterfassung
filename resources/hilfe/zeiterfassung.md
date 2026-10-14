@@ -45,9 +45,11 @@ rollen: zeit-verwaltung
   korrigieren, Sollzeit und Urlaubsanspruch festlegen, Chip oder Code zuordnen, Abwesenheiten eintragen.
 - **Freigaben**: Nachträge und Urlaubsanträge annehmen oder ablehnen. Eigene Anträge gibt immer jemand anderes frei.
 - **Auswertung & Export**: Monatsübersicht, CSV für Personio, Stundenzettel zum Drucken.
-- **Dienstplan**: Abteilung anlegen, unter „einrichten" Besetzung (wann mindestens / optional wie viele), Personen und
-  Sondertage eintragen. „Vorschlag erstellen" plant den Monat; Zellen anklicken zum Ändern, Hinweise beachten,
-  dann veröffentlichen.
+- **Dienstplan**: Abteilung anlegen, unter „Einstellungen" Besetzung (wann mindestens / optional wie viele), Personen und
+  Sondertage eintragen. „Vorschlag erstellen" plant den Monat (jeder Klick eine neue Variante), oder Zellen
+  anklicken und von Hand eintragen – auf Wunsch gleich für alle gleichen Wochentage des Monats. Die Öffnungszeit
+  ist immer besetzt; was über das Wochensoll geht, steht als „Ü" an den letzten Schichten der Woche. Feiertage
+  werden gutgeschrieben. Hinweise beachten, dann veröffentlichen.
 - **Einstellungen**: welche Rollen teilnehmen (Gruppen) und wer sie leitet, Terminals, Regeln.
 
 Jede Änderung bleibt nachvollziehbar: Die alte Buchung wird nicht überschrieben, sondern als „ersetzt" aufbewahrt.

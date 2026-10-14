@@ -19,15 +19,21 @@ use Intranet\Modules\Zeiterfassung\Models\Zeitmodell;
  * „mindestens" und „gewünscht" (= mindestens + optional). Gesetzliche Feiertage
  * (Bundesland der Abteilung) sind geschlossen, Sondertage gehen vor.
  *
- * Vorschlag in drei Schritten:
- *  1. Arbeitstage der Stammkräfte: so viele Tage, wie ihr Monatssoll hergibt,
- *     höchstens ihre Tage je Woche – jeweils dort, wo noch am meisten Bedarf offen ist.
- *     So verteilen sich die freien Tage von selbst versetzt; Samstage rotieren.
- *  2. Uhrzeiten: jede Stammkraft bekommt ihre Tageslänge an der Stelle, die die
- *     meisten offenen Viertelstunden abdeckt (abwechselnd früh/spät bei Gleichstand).
- *  3. Lücken: zuerst alle Mindestbesetzungen des Monats mit Aushilfen (im Rahmen
- *     ihres Budgets), notfalls mit freien Stammkräften (Überstunden); danach die
- *     optionale Besetzung nur noch mit Aushilfen-Budget.
+ * Soll: Tagessoll aus Zeitmodell bzw. Wochenstunden. Feiertage und Abwesenheiten
+ * werden gutgeschrieben (Soll 0) – dem Mitarbeiter fehlt dadurch nichts.
+ *
+ * Vorschlag je Kalenderwoche in drei Schritten:
+ *  1. Tage und Stunden der Stammkräfte: das Wochensoll auf so viele Tage, wie die
+ *     Person je Woche arbeitet, dort, wo am meisten Bedarf offen ist (Samstage reihum).
+ *     Kurze Tage gleichen längere Tage aus, bis zur Öffnungszeit bzw. Tageshöchstzeit.
+ *  2. Uhrzeiten: Wer bisher seltener früh war, öffnet; wer seltener spät war, schließt.
+ *  3. Lücken: Öffnungszeit/Mindestbesetzung immer – angrenzende Schicht verlängern,
+ *     sonst Aushilfe im Budget, sonst Stammkraft an ihrem freien Tag. Was über das
+ *     Wochensoll geht, markiert die Prüfung als Überstunden. Optionale Besetzung nur
+ *     mit Aushilfen-Budget.
+ *
+ * Gleich gute Möglichkeiten entscheidet das Los: „Neu vorschlagen" liefert jedes Mal eine
+ * andere Variante.
  *
  * Immer: Ruhezeit (§ 5), Tageshöchstzeit (§ 3), Pausen (§ 4), höchstens sechs
  * Tage am Stück, keine Schicht an Abwesenheits- oder festen freien Tagen.
@@ -209,21 +215,26 @@ class Planer
                 }
             }
 
-            // Monatssoll: mit Zeitmodell genau dessen Tagessoll (wie die Zeiterfassung rechnet), sonst
-            // Wochenstunden auf die Werktage Mo–Sa verteilt. Feiertage und Abwesenheiten zählen nicht.
-            $ziel = 0;
+            // Tagessoll: mit Zeitmodell genau dessen Soll (wie die Zeiterfassung rechnet), sonst die
+            // Wochenstunden gleich auf die ersten Wochentage verteilt (5 Tage = Mo–Fr). Feiertage und
+            // Abwesenheiten werden gutgeschrieben: Sie mindern das Soll, im Konto fehlt nichts.
+            $sollTag = [];
+            $gutschrift = 0;
             if (! $aushilfe) {
                 for ($d = $this->monat->copy(); $d->lte($this->bis); $d->addDay()) {
-                    if (isset($abwesend[$d->toDateString()]) || Feiertage::name($d, $land)) {
-                        continue;
+                    $soll = $pivot->wochenstunden === null && $modell
+                        ? (Zeitmodell::amTag($liste, $d) ?? $modell)->sollFuer($d->dayOfWeekIso)
+                        : ($d->dayOfWeekIso <= $tageWoche ? intdiv($wochen, $tageWoche) : 0);
+                    if (Feiertage::name($d, $land)) {
+                        $gutschrift += $soll;
+                        $soll = 0;
+                    } elseif (isset($abwesend[$d->toDateString()])) {
+                        $soll = 0;
                     }
-                    if ($pivot->wochenstunden === null && $modell) {
-                        $ziel += (Zeitmodell::amTag($liste, $d) ?? $modell)->sollFuer($d->dayOfWeekIso);
-                    } elseif ($d->dayOfWeekIso <= 6) {
-                        $ziel += intdiv($wochen, 6);
-                    }
+                    $sollTag[$d->toDateString()] = $soll;
                 }
             }
+            $ziel = array_sum($sollTag);
 
             $tagArbeit = $aushilfe ? 0 : min($this->maxTag, intdiv($wochen, $tageWoche));
 
@@ -235,6 +246,8 @@ class Planer
                 'tageWoche' => $aushilfe ? (int) ($pivot->max_tage_woche ?: 6) : $tageWoche,
                 'tagArbeit' => $tagArbeit,
                 'ziel' => $ziel,
+                'sollTag' => $sollTag,
+                'feiertagGutschrift' => $gutschrift,
                 'budget' => $pivot->max_monat !== null ? (int) $pivot->max_monat : null,
                 'frei' => array_map('intval', array_filter(explode(',', (string) $pivot->freie_tage))),
                 'abwesend' => $abwesend,
@@ -257,17 +270,36 @@ class Planer
     /** @var array<string, array<int, int>> Y-m-d => slot => Anzahl */
     private array $abdeckung = [];
 
-    /** @return list<array{user_id: int, datum: string, von: string, bis: string, pause: int}> */
-    public function vorschlagen(): array
+    /** @var array<int, int> Früh minus Spät je Person – hält den Wechsel ausgeglichen */
+    private array $fruehSpaet = [];
+
+    /** @var array<int, int> Samstage je Person */
+    private array $samstage = [];
+
+    /**
+     * Ohne $seed bei jedem Aufruf eine andere, gleich gute Variante (Gleichstände entscheidet das Los).
+     *
+     * @return list<array{user_id: int, datum: string, von: string, bis: string, pause: int}>
+     */
+    public function vorschlagen(?int $seed = null): array
     {
+        mt_srand($seed ?? random_int(1, PHP_INT_MAX));
+
         $this->plan = [];
         $this->abdeckung = [];
         foreach ($this->tage as $datum => $t) {
             $this->abdeckung[$datum] = array_fill_keys(array_keys($t['slots']), 0);
         }
+        $stamm = array_keys(array_filter($this->personen, fn ($p) => ! $p['aushilfe']));
+        $this->fruehSpaet = array_fill_keys($stamm, 0);
+        $this->samstage = array_fill_keys($stamm, 0);
 
-        $arbeitstage = $this->arbeitstageVerteilen();
-        $this->uhrzeitenSetzen($arbeitstage);
+        foreach ($this->wochen() as $woche) {
+            $arbeit = $this->wocheVerteilen($woche, $stamm);
+            foreach ($woche as $datum) {
+                $this->uhrzeitenSetzen($datum, $arbeit[$datum] ?? []);
+            }
+        }
         $this->luecken('min');
         $this->luecken('wunsch');
 
@@ -287,102 +319,210 @@ class Planer
         return $ergebnis;
     }
 
-    /**
-     * Schritt 1: welche Tage arbeitet welche Stammkraft.
-     *
-     * @return array<int, array<string, true>> user => Y-m-d => true
-     */
-    private function arbeitstageVerteilen(): array
+    /** @return list<list<string>> Kalenderwochen des Monats (nur Tage im Monat) */
+    public function wochen(): array
     {
-        $stamm = array_filter($this->personen, fn ($p) => ! $p['aushilfe'] && $p['tagArbeit'] > 0);
-        $arbeitstage = array_fill_keys(array_keys($stamm), []);
-        $samstage = array_fill_keys(array_keys($stamm), 0);
-        $kapazitaet = array_fill_keys(array_keys($this->tage), 0);
-        $sollTage = [];
-        foreach ($stamm as $uid => $p) {
-            $sollTage[$uid] = (int) round($p['ziel'] / max(1, $p['tagArbeit']));
-        }
-
-        $bedarf = [];
+        $wochen = [];
         foreach ($this->tage as $datum => $t) {
-            $bedarf[$datum] = [
-                'min' => array_sum(array_column($t['slots'], 'min')) * self::RASTER,
-                'wunsch' => array_sum(array_column($t['slots'], 'wunsch')) * self::RASTER,
-            ];
+            $wochen[$t['datum']->isoFormat('GGGG-WW')][] = $datum;
         }
 
+        return array_values($wochen);
+    }
+
+    /**
+     * Schritt 1 je Woche: Welche Stammkraft arbeitet an welchen Tagen wie lange?
+     * Ziel ist das Wochensoll (Feiertage und Abwesenheiten sind schon herausgerechnet),
+     * verteilt auf so viele Tage, wie die Person je Woche arbeitet. Kurze Tage (Samstag)
+     * gleichen längere Tage aus – bis zur Öffnungszeit und höchstens zur Tageshöchstzeit.
+     *
+     * @param  list<string>  $woche
+     * @param  list<int>  $stamm
+     * @return array<string, array<int, int>> Y-m-d => user => Arbeitsminuten
+     */
+    private function wocheVerteilen(array $woche, array $stamm): array
+    {
+        $kapazitaet = array_fill_keys($woche, 0);
+        $bedarf = [];
+        foreach ($woche as $datum) {
+            $slots = $this->tage[$datum]['slots'];
+            $bedarf[$datum] = 3 * array_sum(array_column($slots, 'min')) * self::RASTER
+                + array_sum(array_column($slots, 'wunsch')) * self::RASTER;
+        }
+
+        $ziel = [];
+        $tageSoll = [];
+        $tage = [];
+        foreach ($stamm as $uid) {
+            $p = $this->personen[$uid];
+            $ziel[$uid] = array_sum(array_map(fn ($d) => $p['sollTag'][$d] ?? 0, $woche));
+            $moeglich = array_filter($woche, fn ($d) => $this->tage[$d]['offen'] && $this->frei($uid, $this->tage[$d]['datum']));
+            // Tage dieser Kalenderwoche aus dem Vormonat zählen mit.
+            $schonDa = $this->wochenTage($uid, $this->tage[$woche[0]]['datum']);
+            $hoechstens = min(count($moeglich), max(0, $p['tageWoche'] - $schonDa));
+            $n = $ziel[$uid] > 0 ? (int) round($ziel[$uid] / max(1, $p['tagArbeit'])) : 0;
+            $tageSoll[$uid] = min($hoechstens, max($n, (int) ceil($ziel[$uid] / max(1, $this->maxTag))));
+            $tage[$uid] = [];
+        }
+
+        // Tage reihum vergeben: wo am meisten Bedarf offen ist; Samstage reihum; bei Gleichstand das Los.
         do {
             $weiter = false;
-            // Wer anteilig am wenigsten Tage hat, sucht sich als Nächster einen aus.
-            $reihe = array_keys($stamm);
-            usort($reihe, fn ($a, $b) => (count($arbeitstage[$a]) / max(1, $sollTage[$a])) <=> (count($arbeitstage[$b]) / max(1, $sollTage[$b])));
-
+            $reihe = $stamm;
+            shuffle($reihe);
+            usort($reihe, fn ($a, $b) => (count($tage[$a]) / max(1, $tageSoll[$a])) <=> (count($tage[$b]) / max(1, $tageSoll[$b])));
             foreach ($reihe as $uid) {
-                if (count($arbeitstage[$uid]) >= $sollTage[$uid]) {
+                if (count($tage[$uid]) >= $tageSoll[$uid]) {
                     continue;
                 }
-                $p = $stamm[$uid];
-                $anwesenheit = self::anwesenheitFuer($p['tagArbeit']);
-                $wenigsteSamstage = min($samstage);
-
                 $bester = null;
                 $besterWert = null;
-                foreach ($this->tage as $datum => $t) {
-                    if (! $t['offen'] || isset($arbeitstage[$uid][$datum]) || ! $this->frei($uid, $t['datum'])) {
+                foreach ($woche as $datum) {
+                    $t = $this->tage[$datum];
+                    if (! $t['offen'] || isset($tage[$uid][$datum]) || ! $this->frei($uid, $t['datum'])) {
                         continue;
                     }
-                    if ($this->wochenTage($uid, $t['datum'], $arbeitstage[$uid]) >= $p['tageWoche']
-                        || $this->amStueck($uid, $t['datum'], $arbeitstage[$uid]) > 6) {
+                    if ($this->amStueck($uid, $t['datum'], $tage[$uid]) > 6) {
                         continue;
                     }
-
-                    $offenMin = $bedarf[$datum]['min'] - $kapazitaet[$datum];
-                    $offenWunsch = $bedarf[$datum]['wunsch'] - $kapazitaet[$datum];
-                    $wert = 3 * max(0, $offenMin) + max(0, $offenWunsch);
-                    if ($t['datum']->dayOfWeekIso === 6 && $samstage[$uid] > $wenigsteSamstage) {
-                        $wert = intdiv($wert, 2);
+                    $wert = $bedarf[$datum] - $kapazitaet[$datum];
+                    if ($t['datum']->dayOfWeekIso === 6 && $this->samstage[$uid] > min($this->samstage)) {
+                        $wert -= 10000;
                     }
-                    // Gleichstand: wo am meisten offen ist (auch negativ), dann der frühere Tag.
-                    $schluessel = [$wert, $offenWunsch];
-                    if ($besterWert === null || $schluessel > $besterWert) {
-                        $bester = $datum;
-                        $besterWert = $schluessel;
+                    $wert += mt_rand(0, 59);
+                    if ($besterWert === null || $wert > $besterWert) {
+                        [$bester, $besterWert] = [$datum, $wert];
                     }
                 }
-
                 if ($bester !== null) {
-                    $arbeitstage[$uid][$bester] = true;
-                    $kapazitaet[$bester] += $anwesenheit;
+                    $tage[$uid][$bester] = true;
+                    $kapazitaet[$bester] += 3 * self::anwesenheitFuer($this->personen[$uid]['tagArbeit']);
                     if ($this->tage[$bester]['datum']->dayOfWeekIso === 6) {
-                        $samstage[$uid]++;
+                        $this->samstage[$uid]++;
                     }
                     $weiter = true;
                 }
             }
         } while ($weiter);
 
-        return $arbeitstage;
+        // Stunden auf die Tage verteilen (Wasserstand: wer gedeckelt ist, gibt den Rest an die anderen).
+        $ergebnis = [];
+        foreach ($stamm as $uid) {
+            $offen = array_keys($tage[$uid]);
+            $rest = $ziel[$uid];
+            $deckel = [];
+            foreach ($offen as $d) {
+                $span = $this->tage[$d]['ende'] - $this->tage[$d]['start'];
+                $deckel[$d] = min($this->maxTag, $span - self::pauseFuer($span));
+            }
+            while ($offen) {
+                $anteil = $rest / count($offen);
+                $knapp = array_values(array_filter($offen, fn ($d) => $deckel[$d] < $anteil));
+                if (! $knapp) {
+                    foreach ($offen as $nr => $d) {
+                        // auf Viertelstunden runden, Rundungsrest an den letzten Tag
+                        $minuten = $nr === count($offen) - 1 ? $rest : $anteil;
+                        $minuten = (int) round($minuten / self::RASTER) * self::RASTER;
+                        $ergebnis[$d][$uid] = min($deckel[$d], max(self::RASTER, $minuten));
+                        $rest -= $ergebnis[$d][$uid];
+                    }
+                    break;
+                }
+                foreach ($knapp as $d) {
+                    $ergebnis[$d][$uid] = $deckel[$d];
+                    $rest -= $deckel[$d];
+                }
+                $offen = array_values(array_diff($offen, $knapp));
+            }
+        }
+
+        return $ergebnis;
     }
 
     /**
-     * Schritt 2: Uhrzeiten der Stammkräfte.
+     * Schritt 2: Uhrzeiten eines Tages. Wer bisher seltener früh war, beginnt mit der
+     * Öffnung; wer seltener spät war, schließt. Weitere Personen dorthin, wo am meisten fehlt.
      *
-     * @param  array<int, array<string, true>>  $arbeitstage
+     * @param  array<int, int>  $arbeit  user => Arbeitsminuten
      */
-    private function uhrzeitenSetzen(array $arbeitstage): void
+    private function uhrzeitenSetzen(string $datum, array $arbeit): void
     {
-        foreach ($this->tage as $datum => $t) {
-            $heute = array_keys(array_filter($arbeitstage, fn ($tage) => isset($tage[$datum])));
-            usort($heute, fn ($a, $b) => $this->personen[$b]['tagArbeit'] <=> $this->personen[$a]['tagArbeit']);
+        $t = $this->tage[$datum];
+        if (! $arbeit || ! $t['offen']) {
+            return;
+        }
+        $reihe = array_keys($arbeit);
+        shuffle($reihe);
+        usort($reihe, fn ($a, $b) => $this->fruehSpaet[$a] <=> $this->fruehSpaet[$b]);
 
-            foreach ($heute as $nr => $uid) {
-                $laenge = min(self::anwesenheitFuer($this->personen[$uid]['tagArbeit']), $t['ende'] - $t['start']);
-                $this->setzeBeste($uid, $t, $laenge, 'min', spaet: $nr % 2 === 1);
-            }
+        $span = $t['ende'] - $t['start'];
+        foreach ($reihe as $nr => $uid) {
+            $laenge = min($span, self::anwesenheitFuer($arbeit[$uid]));
+            $rolle = match (true) {
+                count($reihe) === 1 => ($this->fruehSpaet[$uid] < 0 || ($this->fruehSpaet[$uid] === 0 && mt_rand(0, 1) === 1)) ? 'frueh' : 'spaet',
+                $nr === 0 => 'frueh',
+                $nr === count($reihe) - 1 => 'spaet',
+                default => 'mitte',
+            };
+            $this->setzeSchicht($uid, $t, $laenge, $rolle);
         }
     }
 
-    /** Schritt 3: offene Viertelstunden auffüllen – 'min' = Mindestbesetzung, 'wunsch' = optionale Besetzung. */
+    private function setzeSchicht(int $uid, array $t, int $laenge, string $rolle): void
+    {
+        $i = $this->index($t['datum']);
+        $kandidaten = [];
+        for ($start = $t['start']; $start + $laenge <= $t['ende']; $start += self::RASTER) {
+            if ($this->ruheOk($uid, $i, $start, $start + $laenge)) {
+                $kandidaten[] = $start;
+            }
+        }
+        if (! $kandidaten) {
+            return;
+        }
+
+        $start = match ($rolle) {
+            'frueh' => $kandidaten[0],
+            'spaet' => $kandidaten[count($kandidaten) - 1],
+            default => $this->besteLage($t, $kandidaten, $laenge),
+        };
+        $this->eintragen($uid, $t, $start, $start + $laenge);
+
+        if ($laenge < $t['ende'] - $t['start']) {
+            $this->fruehSpaet[$uid] += $start === $t['start'] ? 1 : ($start + $laenge === $t['ende'] ? -1 : 0);
+        }
+    }
+
+    /** @param  list<int>  $kandidaten */
+    private function besteLage(array $t, array $kandidaten, int $laenge): int
+    {
+        $datum = $t['datum']->toDateString();
+        $bester = $kandidaten[0];
+        $besterWert = -1;
+        foreach ($kandidaten as $start) {
+            $wert = mt_rand(0, 2);
+            for ($m = $start; $m < $start + $laenge; $m += self::RASTER) {
+                if ($s = $t['slots'][$m] ?? null) {
+                    $ist = $this->abdeckung[$datum][$m];
+                    $wert += $ist < $s['min'] ? 30 : ($ist < $s['wunsch'] ? 10 : 0);
+                }
+            }
+            if ($wert > $besterWert) {
+                [$bester, $besterWert] = [$start, $wert];
+            }
+        }
+
+        return $bester;
+    }
+
+    /**
+     * Schritt 3: offene Viertelstunden auffüllen – 'min' = Öffnungszeit/Mindestbesetzung,
+     * 'wunsch' = optionale Besetzung.
+     *
+     * Mindestbesetzung immer: erst eine angrenzende Schicht verlängern (bis zur Tageshöchstzeit),
+     * dann eine Aushilfe im Budget, dann eine Stammkraft an ihrem freien Tag. Was dabei über das
+     * Wochensoll hinausgeht, markiert die Prüfung als Überstunden.
+     */
     private function luecken(string $stufe): void
     {
         $minSchicht = max(self::RASTER, (int) $this->abteilung->min_schicht);
@@ -399,6 +539,10 @@ class Planer
                 }
                 [$von, $bis] = $luecke;
 
+                if ($stufe === 'min' && $this->verlaengern($t, $von, $bis)) {
+                    continue;
+                }
+
                 $laenge = min(max($bis - $von, $minSchicht), $t['ende'] - $t['start'], self::anwesenheitFuer($this->maxTag));
                 $start = $von + $laenge > $t['ende'] ? max($t['start'], $t['ende'] - $laenge) : $von;
 
@@ -409,7 +553,7 @@ class Planer
                 }
 
                 $p = $this->personen[$uid];
-                if ($p['budget'] !== null) {
+                if ($p['aushilfe'] && $p['budget'] !== null) {
                     $rest = $p['budget'] - $this->geplant($uid);
                     $laenge = min($laenge, intdiv(self::anwesenheitFuer($rest), self::RASTER) * self::RASTER);
                     if ($laenge < self::RASTER) {
@@ -421,6 +565,51 @@ class Planer
                 $this->eintragen($uid, $t, $start, $start + $laenge);
             }
         }
+    }
+
+    /** Eine Schicht desselben Tages, die an die Lücke grenzt, über die Lücke verlängern. */
+    private function verlaengern(array $t, int $von, int $bis): bool
+    {
+        $i = $this->index($t['datum']);
+        $wahl = null;
+        foreach ($this->plan as $uid => $tage) {
+            $s = $tage[$i] ?? null;
+            if (! $s || $this->personen[$uid]['aushilfe']) {
+                continue;
+            }
+            $neu = null;
+            if ($s['von'] < $von && $s['bis'] >= $von && $s['bis'] < $bis) {
+                $neu = ['von' => $s['von'], 'bis' => $bis];
+            } elseif ($s['bis'] > $bis && $s['von'] <= $bis && $s['von'] > $von) {
+                $neu = ['von' => $von, 'bis' => $s['bis']];
+            }
+            if (! $neu) {
+                continue;
+            }
+            $dauer = $neu['bis'] - $neu['von'];
+            if ($dauer - self::pauseFuer($dauer) > $this->maxTag || ! $this->ruheOk($uid, $i, $neu['von'], $neu['bis'])) {
+                continue;
+            }
+            $ueber = $this->geplant($uid) - $this->personen[$uid]['ziel'];
+            if ($wahl === null || $ueber < $wahl[2]) {
+                $wahl = [$uid, $neu, $ueber];
+            }
+        }
+        if (! $wahl) {
+            return false;
+        }
+
+        [$uid, $neu] = $wahl;
+        $alt = $this->plan[$uid][$i];
+        $datum = $t['datum']->toDateString();
+        for ($m = $alt['von']; $m < $alt['bis']; $m += self::RASTER) {
+            if (isset($this->abdeckung[$datum][$m])) {
+                $this->abdeckung[$datum][$m]--;
+            }
+        }
+        $this->eintragen($uid, $t, $neu['von'], $neu['bis']);
+
+        return true;
     }
 
     /** @return array{0: int, 1: int}|null */
@@ -444,18 +633,18 @@ class Planer
         return $von !== null ? [$von, $letzter + self::RASTER] : null;
     }
 
-    /** Aushilfe mit Budget, für die Mindestbesetzung notfalls eine Stammkraft an ihrem freien Tag. */
+    /** Aushilfe mit Budget; für die Mindestbesetzung notfalls eine Stammkraft an ihrem freien Tag (Überstunden). */
     private function kandidatFuerLuecke(array $t, int $von, int $bis, string $stufe, int $minSchicht): ?int
     {
         $i = $this->index($t['datum']);
         $arbeit = $bis - $von - self::pauseFuer($bis - $von);
 
-        $passt = function (int $uid) use ($t, $i, $von, $bis): bool {
+        $passt = function (int $uid, bool $wochenGrenze = true) use ($t, $i, $von, $bis): bool {
             $p = $this->personen[$uid];
 
             return ! isset($this->plan[$uid][$i])
                 && $this->frei($uid, $t['datum'])
-                && $this->wochenTage($uid, $t['datum']) < $p['tageWoche']
+                && (! $wochenGrenze || $this->wochenTage($uid, $t['datum']) < $p['tageWoche'])
                 && $this->amStueck($uid, $t['datum']) <= 6
                 && $this->ruheOk($uid, $i, $von, $bis);
         };
@@ -474,6 +663,8 @@ class Planer
             // Für die optionale Besetzung nur, wenn die ganze Schicht ins Budget passt.
             return $stufe === 'min' ? $rest >= min($arbeit, $minSchicht) : $rest >= $arbeit;
         });
+        $aushilfen = array_values($aushilfen);
+        shuffle($aushilfen);
         usort($aushilfen, fn ($a, $b) => $this->geplant($a) <=> $this->geplant($b));
         if ($aushilfen) {
             return $aushilfen[0];
@@ -483,52 +674,16 @@ class Planer
             return null;
         }
 
-        $stamm = array_filter(array_keys($this->personen), fn ($uid) => ! $this->personen[$uid]['aushilfe'] && $passt($uid));
-        usort($stamm, fn ($a, $b) => ($this->geplant($a) - $this->personen[$a]['ziel']) <=> ($this->geplant($b) - $this->personen[$b]['ziel']));
-
-        return $stamm[0] ?? null;
-    }
-
-    /** Legt eine Schicht der Länge $laenge dorthin, wo sie die meisten offenen Viertelstunden abdeckt. */
-    private function setzeBeste(int $uid, array $t, int $laenge, string $stufe, bool $spaet): void
-    {
-        $i = $this->index($t['datum']);
-        $frueheste = $t['start'];
-        $vortag = $this->schichtAm($uid, $i - 1);
-        if ($vortag) {
-            $frueheste = max($frueheste, $vortag['bis'] + $this->ruhezeit - 1440);
-            $frueheste = (int) ceil($frueheste / self::RASTER) * self::RASTER;
-        }
-        if ($frueheste + $laenge > $t['ende']) {
-            $laenge = $t['ende'] - $frueheste;
-        }
-        if ($laenge < self::RASTER) {
-            return;
-        }
-
-        $bester = null;
-        $besterWert = -1;
-        for ($start = $frueheste; $start + $laenge <= $t['ende']; $start += self::RASTER) {
-            if (! $this->ruheOk($uid, $i, $start, $start + $laenge)) {
-                continue;
-            }
-            $wert = 0;
-            for ($m = $start; $m < $start + $laenge; $m += self::RASTER) {
-                $s = $t['slots'][$m] ?? null;
-                if ($s) {
-                    $ist = $this->abdeckung[$t['datum']->toDateString()][$m];
-                    $wert += $ist < $s['min'] ? 3 : ($ist < $s['wunsch'] ? 1 : 0);
-                }
-            }
-            if ($wert > $besterWert || ($spaet && $wert === $besterWert)) {
-                $bester = $start;
-                $besterWert = $wert;
+        // Öffnungszeit geht vor: erst innerhalb der Tage je Woche, sonst auch darüber hinaus.
+        foreach ([true, false] as $grenze) {
+            $stamm = array_values(array_filter(array_keys($this->personen), fn ($uid) => ! $this->personen[$uid]['aushilfe'] && $passt($uid, $grenze)));
+            usort($stamm, fn ($a, $b) => ($this->geplant($a) - $this->personen[$a]['ziel']) <=> ($this->geplant($b) - $this->personen[$b]['ziel']));
+            if ($stamm) {
+                return $stamm[0];
             }
         }
 
-        if ($bester !== null) {
-            $this->eintragen($uid, $t, $bester, $bester + $laenge);
-        }
+        return null;
     }
 
     private function eintragen(int $uid, array $t, int $von, int $bis): void
@@ -633,7 +788,7 @@ class Planer
     public function pruefen(Collection $schichten): array
     {
         $this->plan = [];
-        $ergebnis = ['tage' => [], 'personen' => [], 'zellen' => []];
+        $ergebnis = ['tage' => [], 'personen' => [], 'zellen' => [], 'ueberstunden' => [], 'wochen' => []];
 
         $abdeckung = [];
         foreach ($this->tage as $datum => $t) {
@@ -715,6 +870,34 @@ class Planer
                 }
             }
 
+            // Überstunden je Kalenderwoche: was über das Wochensoll hinausgeht, an den letzten Schichten der Woche markieren.
+            $eigene = $proSchicht->get($uid, collect())->keyBy(fn (Schicht $s) => $s->datum->toDateString());
+            foreach ($this->wochen() as $woche) {
+                $soll = array_sum(array_map(fn ($d) => $p['sollTag'][$d] ?? 0, $woche));
+                $ist = array_sum(array_map(fn ($d) => $eigene->get($d)?->arbeit() ?? 0, $woche));
+                $ergebnis['wochen'][$uid][end($woche)] = ['soll' => $soll, 'ist' => $ist];
+            }
+            if (! $p['aushilfe']) {
+                foreach ($this->wochen() as $woche) {
+                    $soll = array_sum(array_map(fn ($d) => $p['sollTag'][$d] ?? 0, $woche));
+                    $ist = array_sum(array_map(fn ($d) => $eigene->get($d)?->arbeit() ?? 0, $woche));
+                    $mehr = $ist - $soll;
+                    if ($mehr < self::RASTER) {
+                        continue;
+                    }
+                    $warnungen[] = 'KW '.$this->tage[$woche[0]]['datum']->isoWeek.': '.Format::dauer($mehr, true).' Std. Überstunden';
+                    foreach (array_reverse($woche) as $d) {
+                        if ($mehr <= 0) {
+                            break;
+                        }
+                        if ($s = $eigene->get($d)) {
+                            $ergebnis['ueberstunden'][$uid][$d] = min($mehr, $s->arbeit());
+                            $mehr -= $s->arbeit();
+                        }
+                    }
+                }
+            }
+
             if ($p['budget'] !== null && $geplant > $p['budget']) {
                 $warnungen[] = 'Budget überschritten: '.Format::dauer($geplant).' von '.Format::dauer($p['budget']).' Std.';
             }
@@ -725,6 +908,7 @@ class Planer
             $ergebnis['personen'][$uid] = [
                 'geplant' => $geplant,
                 'ziel' => $p['ziel'],
+                'gutschrift' => $p['feiertagGutschrift'] ?? 0,
                 'budget' => $p['budget'],
                 'warnungen' => $warnungen,
             ];

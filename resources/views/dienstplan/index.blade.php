@@ -21,7 +21,7 @@
                                class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">{{ $m->isoFormat('MMMM') }}</a>
                         @endforeach
                         @if ($planer)
-                            <a href="{{ route('module.zeiterfassung.dienstplan.abteilung', $a) }}" class="rounded-lg px-3 py-1.5 text-sm text-gray-500 hover:bg-gray-100">einrichten</a>
+                            <a href="{{ route('module.zeiterfassung.dienstplan.abteilung', $a) }}" class="rounded-lg px-3 py-1.5 text-sm text-gray-500 hover:bg-gray-100">Einstellungen</a>
                         @endif
                     </div>
                 @empty
