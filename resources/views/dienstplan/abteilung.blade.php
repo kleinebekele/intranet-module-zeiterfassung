@@ -80,7 +80,8 @@
             <h2 class="text-base font-semibold text-gray-800">Personen</h2>
             <p class="mt-1 text-sm text-gray-500">
                 Sollzeit und Kernarbeitszeit stehen im Zeitmodell der Person (Zeiterfassung → Einstellungen → Gruppe).
-                <strong>Stunden für diese Abteilung</strong>: wie viel der Sollzeit hier eingeplant wird – leer = die ganze Sollzeit.
+                <strong>Stunden für diese Abteilung</strong>: wie viel der Sollzeit hier eingeplant wird – leer = die ganze Sollzeit,
+                höchstens die Sollzeit abzüglich der Stunden in anderen Abteilungen.
                 <strong>Aushilfen</strong> planen mit ihrem Monatsbudget (z. B. Minijob-Grenze ÷ Stundenlohn).
             </p>
             <form method="POST" action="{{ route('module.zeiterfassung.dienstplan.abteilung.personen', $abteilung) }}" class="mt-4">
@@ -116,7 +117,21 @@
                                         </div>
                                     </td>
                                     <td class="px-2 py-1.5"><input type="checkbox" name="personen[{{ $p->id }}][aushilfe]" value="1" @checked($p->pivot->aushilfe) class="rounded border-gray-300 text-indigo-600"></td>
-                                    <td class="px-2 py-1.5"><input type="text" name="personen[{{ $p->id }}][wochenstunden]" value="{{ $dauer($p->pivot->wochenstunden) }}" placeholder="{{ $m ? 'alle ('.$dauer($m->wochenMinuten()).')' : '' }}" class="w-24 rounded-lg border-gray-300 text-sm"></td>
+                                    @php
+                                        $andere = $anderswo[$p->id] ?? null;
+                                        $hoechstens = $m ? max(0, $m->wochenMinuten() - ($andere['minuten'] ?? 0)) : null;
+                                        $zuViel = $hoechstens !== null && $p->pivot->wochenstunden !== null && $p->pivot->wochenstunden > $hoechstens;
+                                    @endphp
+                                    <td class="px-2 py-1.5">
+                                        <input type="text" name="personen[{{ $p->id }}][wochenstunden]" value="{{ old("personen.{$p->id}.wochenstunden", $dauer($p->pivot->wochenstunden)) }}"
+                                               placeholder="{{ $m ? 'alle ('.$dauer($m->wochenMinuten()).')' : '' }}"
+                                               class="w-24 rounded-lg text-sm {{ $zuViel ? 'border-red-400' : 'border-gray-300' }}">
+                                        @if ($hoechstens !== null)
+                                            <div class="mt-0.5 text-[11px] {{ $zuViel ? 'font-semibold text-red-600' : 'text-gray-400' }}">
+                                                höchstens {{ $dauer($hoechstens) }}@if ($andere) <span title="{{ $andere['text'] }}">(Rest nach anderen Abteilungen)</span>@endif
+                                            </div>
+                                        @endif
+                                    </td>
                                     <td class="px-2 py-1.5"><input type="text" name="personen[{{ $p->id }}][max_monat]" value="{{ $dauer($p->pivot->max_monat) }}" placeholder="unbegrenzt" class="w-24 rounded-lg border-gray-300 text-sm"></td>
                                     <td class="px-2 py-1.5"><input type="number" min="1" max="6" name="personen[{{ $p->id }}][max_tage_woche]" value="{{ $p->pivot->max_tage_woche }}" placeholder="{{ $m?->arbeitstageJeWoche() ?: 5 }}" class="w-20 rounded-lg border-gray-300 text-sm"></td>
                                     <td class="px-2 py-1.5">

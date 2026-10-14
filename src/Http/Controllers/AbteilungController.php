@@ -32,13 +32,12 @@ class AbteilungController
         $this->darf($request);
         $abteilung->load(['besetzung', 'personen', 'sondertage' => fn ($q) => $q->whereDate('datum', '>=', today()->subMonths(2))]);
 
-        $modelle = Zeitmodell::whereIn('user_id', $abteilung->personen->pluck('id'))
-            ->orderBy('gueltig_ab')->get()->groupBy('user_id')
-            ->map(fn ($liste) => Zeitmodell::amTag($liste, today()));
+        $ids = $abteilung->personen->pluck('id')->all();
 
         return view('zeiterfassung::dienstplan.abteilung', [
             'abteilung' => $abteilung,
-            'modelle' => $modelle,
+            'modelle' => $this->modelle($ids),
+            'anderswo' => $this->anderswo($abteilung, $ids),
             'benutzer' => User::orderBy('name')->get(['id', 'name']),
             'laender' => Feiertage::LAENDER,
             'feiertage' => collect(Feiertage::fuerJahr(today()->year, $abteilung->land()))
@@ -137,6 +136,10 @@ class AbteilungController
             'neu' => ['nullable', 'integer', 'exists:users,id'],
         ]);
 
+        $ids = array_map('intval', array_keys($data['personen'] ?? []));
+        $modelle = $this->modelle($ids);
+        $anderswo = $this->anderswo($abteilung, $ids);
+
         $sync = [];
         $position = 0;
         foreach ($data['personen'] ?? [] as $uid => $p) {
@@ -148,6 +151,21 @@ class AbteilungController
             if (($p['wochenstunden'] ?? '') !== '' && $wochen === null || ($p['max_monat'] ?? '') !== '' && $budget === null) {
                 return back()->withInput()->with('error', 'Stunden bitte als 40:00 oder 40 angeben.');
             }
+
+            // Mehr als die Sollzeit (abzüglich anderer Abteilungen) lässt sich hier nicht einplanen.
+            $soll = $modelle[(int) $uid]?->wochenMinuten();
+            if ($wochen !== null && $soll) {
+                $frei = max(0, $soll - ($anderswo[(int) $uid]['minuten'] ?? 0));
+                if ($wochen > $frei) {
+                    $name = User::find($uid)?->name;
+                    $text = "{$name}: ".Format::dauer($wochen).' Std. für diese Abteilung – möglich sind höchstens '.Format::dauer($frei)
+                        .' Std. (Sollzeit '.Format::dauer($soll).' Std./Woche'
+                        .(! empty($anderswo[(int) $uid]['text']) ? ', davon schon in '.$anderswo[(int) $uid]['text'] : '').').';
+
+                    return back()->withInput()->with('error', $text);
+                }
+            }
+
             $sync[(int) $uid] = [
                 'aushilfe' => $request->boolean("personen.{$uid}.aushilfe"),
                 'wochenstunden' => $wochen,
@@ -225,6 +243,47 @@ class AbteilungController
         Korrektur::audit('zeiterfassung.einstellungen', "Abteilung {$name} mit allen Dienstplänen entfernt", null);
 
         return redirect()->route('module.zeiterfassung.dienstplan.index')->with('status', "Abteilung {$name} entfernt.");
+    }
+
+    /**
+     * Gültiges Zeitmodell je Person (heute, sonst das erste künftige).
+     *
+     * @param  list<int>  $ids
+     * @return array<int, ?Zeitmodell>
+     */
+    private function modelle(array $ids): array
+    {
+        $liste = Zeitmodell::whereIn('user_id', $ids)->orderBy('gueltig_ab')->orderBy('id')->get()->groupBy('user_id');
+
+        return collect($ids)->mapWithKeys(fn ($id) => [$id => isset($liste[$id]) ? (Zeitmodell::amTag($liste[$id], today()) ?? $liste[$id]->first()) : null])->all();
+    }
+
+    /**
+     * Stunden, die eine Person schon in anderen Abteilungen verplant hat (leer = ganze Sollzeit).
+     *
+     * @param  list<int>  $ids
+     * @return array<int, array{minuten: int, text: string}>
+     */
+    private function anderswo(Abteilung $abteilung, array $ids): array
+    {
+        $modelle = $this->modelle($ids);
+        $ergebnis = [];
+        $zeilen = \Illuminate\Support\Facades\DB::table('zeit_abteilung_personen')
+            ->join('zeit_abteilungen', 'zeit_abteilungen.id', '=', 'zeit_abteilung_personen.abteilung_id')
+            ->whereIn('user_id', $ids)->where('abteilung_id', '!=', $abteilung->id)
+            ->get(['user_id', 'wochenstunden', 'aushilfe', 'zeit_abteilungen.name']);
+        foreach ($zeilen as $z) {
+            if ($z->aushilfe) {
+                continue;
+            }
+            $minuten = $z->wochenstunden !== null ? (int) $z->wochenstunden : ($modelle[(int) $z->user_id]?->wochenMinuten() ?? 0);
+            $e = $ergebnis[(int) $z->user_id] ?? ['minuten' => 0, 'text' => ''];
+            $e['minuten'] += $minuten;
+            $e['text'] = ltrim($e['text'].', '.$z->name.' '.Format::dauer($minuten), ', ');
+            $ergebnis[(int) $z->user_id] = $e;
+        }
+
+        return $ergebnis;
     }
 
     private function darf(Request $request): void
