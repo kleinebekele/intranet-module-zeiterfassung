@@ -153,7 +153,7 @@
                             <li class="py-1.5 text-gray-400">Noch kein Chip und kein Code.</li>
                         @endforelse
                     </ul>
-                    <p class="mt-1 text-xs text-gray-400">Chips aus der Kantine gelten am Terminal automatisch mit.</p>
+                    <p class="mt-1 text-xs text-gray-400">Chips aus der Mensa gelten am Terminal automatisch mit.</p>
 
                     <form method="POST" action="{{ route('module.zeiterfassung.team.chip', $person) }}" class="mt-3 flex flex-wrap gap-2">
                         @csrf
