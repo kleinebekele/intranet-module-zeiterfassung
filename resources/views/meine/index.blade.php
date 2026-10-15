@@ -57,10 +57,16 @@
                     </div>
                     @if (session('zeit_geraet'))
                         @php $neu = session('zeit_geraet'); @endphp
-                        <div class="mt-2 rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900">
-                            <div class="font-semibold">„{{ $neu['name'] }}“ verbinden – im Programm eintragen:</div>
-                            <div class="mt-1">Adresse: <code class="rounded bg-white px-1.5 py-0.5 text-xs">{{ $neu['adresse'] }}</code></div>
-                            <div class="mt-1">Schlüssel: <code class="break-all rounded bg-white px-1.5 py-0.5 text-xs">{{ $neu['schluessel'] }}</code></div>
+                        @php $code = rtrim($neu['adresse'], '/').'#'.$neu['schluessel']; @endphp
+                        <div class="mt-2 rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900"
+                             x-data="{ kopiert: false, kopieren() { navigator.clipboard?.writeText(this.$refs.code.value).then(() => this.kopiert = true); this.$refs.code.select(); } }">
+                            <div class="font-semibold">„{{ $neu['name'] }}“ verbinden – diesen Verbindungscode ins Programm einfügen:</div>
+                            <div class="mt-2 flex flex-wrap gap-2">
+                                <input type="text" readonly x-ref="code" value="{{ $code }}" @focus="$el.select()"
+                                       class="min-w-64 flex-1 rounded-lg border-indigo-200 bg-white font-mono text-xs">
+                                <button type="button" @click="kopieren()" class="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700"
+                                        x-text="kopiert ? 'Kopiert ✓' : 'Kopieren'">Kopieren</button>
+                            </div>
                             <div class="mt-1 text-xs text-indigo-700">Wird nur jetzt angezeigt. Geht er verloren: Gerät trennen und neu verbinden.</div>
                         </div>
                     @endif
@@ -86,7 +92,7 @@
                             @endif
                         </li>
                         <li>Unten einen Gerätenamen eingeben und „Gerät verbinden“ klicken.</li>
-                        <li>Adresse und Schlüssel ins Programm übernehmen – fertig. Es startet danach mit Windows.</li>
+                        <li>Den angezeigten Verbindungscode kopieren und im Programm einfügen – fertig. Es startet danach mit Windows.</li>
                     </ol>
                     <p class="mt-1 text-xs text-gray-400">Windows warnt beim ersten Start evtl. „Der Computer wurde durch Windows geschützt“: auf „Weitere Informationen“ und „Trotzdem ausführen“ klicken.</p>
                     <form method="POST" action="{{ route('module.zeiterfassung.meine.geraet') }}" class="mt-2 flex flex-wrap gap-2">

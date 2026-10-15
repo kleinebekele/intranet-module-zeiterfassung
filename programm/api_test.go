@@ -63,3 +63,17 @@ func TestFeierabendGrund(t *testing.T) {
 		t.Fatal("Schicht läuft noch – kein Feierabend")
 	}
 }
+
+func TestZerlegeCode(t *testing.T) {
+	for code, erwartet := range map[string][2]string{
+		"https://intranet.example.org#zg_abc": {"https://intranet.example.org", "zg_abc"},
+		" intranet.example.org/#zg_abc ":      {"https://intranet.example.org/", "zg_abc"},
+		"zg_abc":                              {"", "zg_abc"},
+		"https://intranet.example.org":        {"https://intranet.example.org", ""},
+	} {
+		a, s := zerlegeCode(code)
+		if a != erwartet[0] || s != erwartet[1] {
+			t.Errorf("%q → %q, %q", code, a, s)
+		}
+	}
+}

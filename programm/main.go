@@ -19,7 +19,7 @@ import (
 	"github.com/ncruces/zenity"
 )
 
-const Version = "1.0.0"
+const Version = "1.0.1"
 
 const titel = "Zeiterfassung"
 
@@ -162,33 +162,44 @@ func (a *App) start() {
 	}
 }
 
-// Verbindung einrichten: Adresse und Schlüssel aus „Meine Zeiten → PC-Programm".
+// Verbindung einrichten. Das Intranet zeigt nach „Gerät verbinden" einen Verbindungscode
+// „Adresse#Schlüssel" – den fügt man hier in ein einziges Feld ein. Das Eingabefenster hat nur
+// Platz für eine kurze Zeile, die Anleitung steht deshalb vorher in einem eigenen Hinweis.
 func (a *App) einrichten(erstesMal bool) bool {
 	a.dialog.Store(true)
 	defer a.dialog.Store(false)
 
-	e, _ := ladeEinstellungen()
-	text := "Adresse des Intranets – steht unter „Meine Zeiten → PC-Programm“ nach „Gerät verbinden“:"
 	if erstesMal {
-		text = "Willkommen! Einmalig einrichten.\n\nIm Intranet unter „Meine Zeiten → PC-Programm“ auf „Gerät verbinden“ klicken.\nDann hier die angezeigte Adresse eintragen:"
+		_ = zenity.Info("Willkommen bei der Zeiterfassung!\n\nEinmalig einrichten:\n"+
+			"1. Im Intranet „Zeiterfassung → Meine Zeiten“ öffnen.\n"+
+			"2. In der Karte „PC-Programm“ einen Gerätenamen eingeben und „Gerät verbinden“ klicken.\n"+
+			"3. Den angezeigten Verbindungscode kopieren und im nächsten Fenster einfügen.",
+			zenity.Title(titel), zenity.OKLabel("Weiter"))
 	}
+
 	for {
-		adresse, err := zenity.Entry(text, zenity.Title(titel), zenity.EntryText(e.Adresse), zenity.OKLabel("Weiter"), zenity.CancelLabel("Abbrechen"))
+		code, err := zenity.Entry("Verbindungscode einfügen:", zenity.Title(titel), zenity.OKLabel("Verbinden"), zenity.CancelLabel("Abbrechen"))
 		if err != nil {
 			return false
 		}
-		adresse = strings.TrimSpace(adresse)
-		if adresse != "" && !strings.HasPrefix(adresse, "http") {
-			adresse = "https://" + adresse
+		adresse, schluessel := zerlegeCode(code)
+		// Notfalls einzeln: nur Schlüssel oder nur Adresse eingefügt.
+		if adresse == "" && schluessel != "" {
+			if adresse, err = zenity.Entry("Adresse des Intranets:", zenity.Title(titel), zenity.OKLabel("Weiter"), zenity.CancelLabel("Abbrechen")); err != nil {
+				return false
+			}
+			adresse, _ = zerlegeCode(adresse)
 		}
-		schluessel, err := zenity.Entry("Und den Schlüssel (beginnt mit „zg_“):", zenity.Title(titel), zenity.OKLabel("Verbinden"), zenity.CancelLabel("Abbrechen"))
-		if err != nil {
-			return false
+		if schluessel == "" && adresse != "" {
+			if schluessel, err = zenity.Entry("Schlüssel (beginnt mit zg_):", zenity.Title(titel), zenity.OKLabel("Verbinden"), zenity.CancelLabel("Abbrechen")); err != nil {
+				return false
+			}
+			schluessel = strings.TrimSpace(schluessel)
 		}
+
 		i := NeuesIntranet(adresse, schluessel)
 		if err := i.Pruefen(); err != nil {
-			_ = zenity.Error("Verbindung hat nicht geklappt:\n\n"+err.Error()+"\n\nBitte Adresse und Schlüssel prüfen.", zenity.Title(titel))
-			e.Adresse = adresse
+			_ = zenity.Error("Verbindung hat nicht geklappt:\n\n"+err.Error()+"\n\nBitte den Verbindungscode im Intranet neu kopieren (ggf. Gerät trennen und neu verbinden).", zenity.Title(titel))
 			continue
 		}
 		if err := speichereEinstellungen(Einstellungen{Adresse: i.Adresse, Schluessel: i.Schluessel}); err != nil {
@@ -198,9 +209,26 @@ func (a *App) einrichten(erstesMal bool) bool {
 		a.mu.Lock()
 		a.intranet = i
 		a.mu.Unlock()
-		_ = zenity.Info("Verbunden. Die Zeiterfassung startet ab jetzt mit Windows – das Uhr-Symbol findest du unten rechts neben der Uhrzeit.", zenity.Title(titel))
+		_ = zenity.Info("Verbunden!\n\nDie Zeiterfassung startet ab jetzt mit Windows.\nDas Uhr-Symbol findest du unten rechts neben der Uhrzeit (ggf. unter dem kleinen Pfeil ^).", zenity.Title(titel))
 		return true
 	}
+}
+
+// „https://intranet.firma.de#zg_…" → Adresse und Schlüssel; einzelne Teile gehen auch.
+func zerlegeCode(code string) (adresse, schluessel string) {
+	code = strings.TrimSpace(code)
+	if i := strings.Index(code, "#zg_"); i >= 0 {
+		adresse, schluessel = code[:i], code[i+1:]
+	} else if strings.HasPrefix(code, "zg_") {
+		schluessel = code
+	} else {
+		adresse = code
+	}
+	adresse = strings.TrimSpace(adresse)
+	if adresse != "" && !strings.HasPrefix(adresse, "http") {
+		adresse = "https://" + adresse
+	}
+	return adresse, strings.TrimSpace(schluessel)
 }
 
 // Fragen beim Start: Rechner war aus während eingestempelt? Pause von gestern? Arbeitszeit starten?

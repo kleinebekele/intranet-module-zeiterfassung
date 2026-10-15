@@ -60,7 +60,8 @@ class MeineZeitenController
         Geraet::create(['user_id' => $user->id, 'name' => $data['name'], 'token_hash' => Geraet::hash($token)]);
         Korrektur::audit('zeiterfassung.ausweis', "PC-Programm verbunden ({$data['name']})", $user);
 
-        return back()->with('zeit_geraet', ['name' => $data['name'], 'schluessel' => $token, 'adresse' => url('/')]);
+        // APP_URL statt der Anfrage-Adresse: hinter dem Proxy wäre das die interne Adresse.
+        return back()->with('zeit_geraet', ['name' => $data['name'], 'schluessel' => $token, 'adresse' => config('app.url') ?: url('/')]);
     }
 
     public function geraetEntfernen(Request $request, Geraet $geraet)
