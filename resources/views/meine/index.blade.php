@@ -83,23 +83,29 @@
                             </div>
                         @endforeach
                     </div>
-                    <ol class="mt-2 list-inside list-decimal space-y-0.5 text-sm text-gray-600">
-                        <li>Programm herunterladen und starten (Windows).
-                            @if ($programmDa)
-                                <a href="{{ route('module.zeiterfassung.meine.programm') }}" class="ml-1 inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1 text-xs font-medium text-white hover:bg-indigo-700"><i class="bx bx-download"></i> Für Windows herunterladen</a>
-                            @else
-                                <span class="text-gray-400">(noch nicht verfügbar)</span>
-                            @endif
-                        </li>
-                        <li>Unten einen Gerätenamen eingeben und „Gerät verbinden“ klicken.</li>
-                        <li>Den angezeigten Verbindungscode kopieren und im Programm einfügen – fertig. Es startet danach mit Windows.</li>
-                    </ol>
-                    <p class="mt-1 text-xs text-gray-400">Windows warnt beim ersten Start evtl. „Der Computer wurde durch Windows geschützt“: auf „Weitere Informationen“ und „Trotzdem ausführen“ klicken.</p>
-                    <form method="POST" action="{{ route('module.zeiterfassung.meine.geraet') }}" class="mt-2 flex flex-wrap gap-2">
-                        @csrf
-                        <input type="text" name="name" required maxlength="150" placeholder="Gerätename, z. B. Laptop Büro" class="min-w-48 flex-1 rounded-lg border-gray-300 text-sm">
-                        <button type="submit" class="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Gerät verbinden</button>
-                    </form>
+                    @php $einklappen = $geraete->isNotEmpty() && ! session('zeit_geraet'); @endphp
+                    <details @if (! $einklappen) open @endif class="group mt-2">
+                        <summary class="{{ $einklappen ? '' : 'hidden' }} cursor-pointer list-none text-sm text-indigo-600 hover:underline">
+                            <span class="group-open:hidden">Weitere Geräte einrichten …</span><span class="hidden group-open:inline">Weitere Geräte einrichten – zuklappen</span>
+                        </summary>
+                        <ol class="mt-2 list-inside list-decimal space-y-0.5 text-sm text-gray-600">
+                            <li>Programm herunterladen und starten (Windows).
+                                @if ($programmDa)
+                                    <a href="{{ route('module.zeiterfassung.meine.programm') }}" class="ml-1 inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1 text-xs font-medium text-white hover:bg-indigo-700"><i class="bx bx-download"></i> Für Windows herunterladen</a>
+                                @else
+                                    <span class="text-gray-400">(noch nicht verfügbar)</span>
+                                @endif
+                            </li>
+                            <li>Unten einen Gerätenamen eingeben und „Gerät verbinden“ klicken.</li>
+                            <li>Den angezeigten Verbindungscode kopieren und im Programm einfügen – fertig. Es startet danach mit Windows.</li>
+                        </ol>
+                        <p class="mt-1 text-xs text-gray-400">Windows warnt beim ersten Start evtl. „Der Computer wurde durch Windows geschützt“: auf „Weitere Informationen“ und „Trotzdem ausführen“ klicken.</p>
+                        <form method="POST" action="{{ route('module.zeiterfassung.meine.geraet') }}" class="mt-2 flex flex-wrap gap-2">
+                            @csrf
+                            <input type="text" name="name" required maxlength="150" placeholder="Gerätename, z. B. Laptop Büro" class="min-w-48 flex-1 rounded-lg border-gray-300 text-sm">
+                            <button type="submit" class="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Gerät verbinden</button>
+                        </form>
+                    </details>
                 </div>
             @endif
 
