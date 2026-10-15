@@ -1,0 +1,65 @@
+package main
+
+import (
+	"os"
+	"testing"
+	"time"
+)
+
+// Läuft nur mit ZE_ADRESSE und ZE_SCHLUESSEL (Testgerät an einer lokalen Instanz).
+func TestSchnittstelle(t *testing.T) {
+	adresse, schluessel := os.Getenv("ZE_ADRESSE"), os.Getenv("ZE_SCHLUESSEL")
+	if adresse == "" || schluessel == "" {
+		t.Skip("ZE_ADRESSE/ZE_SCHLUESSEL nicht gesetzt")
+	}
+	i := NeuesIntranet(adresse, schluessel)
+
+	if err := NeuesIntranet(adresse, "zg_falsch").Pruefen(); err == nil {
+		t.Fatal("falscher Schlüssel wurde angenommen")
+	} else {
+		t.Log("falscher Schlüssel:", err)
+	}
+
+	s, err := i.Status()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Status: %s, %s, heute %d Min., Soll %d, Kern %+v, Regeln %+v", s.Person, s.Zustand, s.HeuteMinuten, s.SollHeute, s.Kern, s.Regeln)
+
+	m, err := i.Stempeln("kommen")
+	t.Log("Kommen:", m, err)
+	_, err = i.Stempeln("kommen")
+	t.Log("Kommen doppelt (soll Fehler):", err)
+
+	m, err = i.GehenNachtragen(time.Now().Add(-1*time.Minute), true)
+	t.Log("Gehen nachtragen (Ende vor Beginn → Fehler erwartet):", m, err)
+	m, err = i.Stempeln("gehen")
+	t.Log("Gehen:", m, err)
+
+	s, _ = i.Status()
+	t.Logf("Danach: %s, Aktionen %v", s.Zustand, s.Aktionen)
+	if s.Zustand != "weg" {
+		t.Fatal("erwartet: weg")
+	}
+}
+
+func TestSymbol(t *testing.T) {
+	b := symbol(farbeDa)
+	if len(b) < 100 || b[2] != 1 {
+		t.Fatal("Symbol ungültig")
+	}
+}
+
+func TestFeierabendGrund(t *testing.T) {
+	s := &Status{SollHeute: 480}
+	if feierabendGrund(s, 470, time.Now()) != "" {
+		t.Fatal("zu früh")
+	}
+	if feierabendGrund(s, 480, time.Now()) == "" {
+		t.Fatal("Soll erreicht, aber kein Hinweis")
+	}
+	s.Schicht = &Zeitraum{Von: "00:00", Bis: "23:59"}
+	if feierabendGrund(s, 600, time.Now()) != "" {
+		t.Fatal("Schicht läuft noch – kein Feierabend")
+	}
+}

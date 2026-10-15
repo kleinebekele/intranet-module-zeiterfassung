@@ -26,6 +26,7 @@ Route::middleware(['web', 'auth'])
         Route::post('meine/buchung', [MeineZeitenController::class, 'buchung'])->name('meine.buchung');
         Route::post('meine/loeschen', [MeineZeitenController::class, 'loeschen'])->name('meine.loeschen');
         Route::post('meine/code', [MeineZeitenController::class, 'code'])->name('meine.code');
+        Route::get('meine/programm', [MeineZeitenController::class, 'programm'])->name('meine.programm');
         Route::post('meine/geraete', [MeineZeitenController::class, 'geraetAnlegen'])->name('meine.geraet');
         Route::post('meine/geraete/{geraet}/entfernen', [MeineZeitenController::class, 'geraetEntfernen'])->name('meine.geraet.entfernen');
 

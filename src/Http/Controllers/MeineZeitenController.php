@@ -30,7 +30,23 @@ class MeineZeitenController
             'verstoesse' => Verstoss::where('user_id', $user->id)->where('datum', '>=', now()->subDays(30))->orderByDesc('datum')->get(),
             'hatCode' => Ausweis::where('user_id', $user->id)->where('art', Ausweis::CODE)->exists(),
             'geraete' => Geraet::where('user_id', $user->id)->orderBy('name')->get(),
+            'programmDa' => is_file(self::programmDatei()),
         ]);
+    }
+
+    /** Das PC-Programm herunterladen (liegt dem Modul bei, gebaut aus programm/). */
+    public function programm(Request $request)
+    {
+        abort_unless(Rechte::darfWebStempeln($request->user()), 403, 'Stempeln am PC ist für dich nicht freigeschaltet.');
+        $datei = self::programmDatei();
+        abort_unless(is_file($datei), 404, 'Das Programm ist in dieser Version nicht enthalten.');
+
+        return response()->download($datei, 'Zeiterfassung.exe', ['Content-Type' => 'application/vnd.microsoft.portable-executable']);
+    }
+
+    public static function programmDatei(): string
+    {
+        return dirname(__DIR__, 3).'/resources/programm/Zeiterfassung.exe';
     }
 
     /** PC-Programm verbinden: Schlüssel wird genau einmal angezeigt. */
