@@ -49,6 +49,42 @@
                 </div>
             </div>
 
+            @if ($webStempeln)
+                <div class="rounded-xl border border-gray-200 bg-white p-4">
+                    <div class="flex flex-wrap items-baseline justify-between gap-2">
+                        <div class="text-xs uppercase tracking-wide text-gray-400">PC-Programm</div>
+                        <span class="text-xs text-gray-400">fragt beim Start „Arbeitszeit starten?“ und erinnert an Pause und Feierabend – gebucht wird nur, was du anklickst</span>
+                    </div>
+                    @if (session('zeit_geraet'))
+                        @php $neu = session('zeit_geraet'); @endphp
+                        <div class="mt-2 rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900">
+                            <div class="font-semibold">„{{ $neu['name'] }}“ verbinden – im Programm eintragen:</div>
+                            <div class="mt-1">Adresse: <code class="rounded bg-white px-1.5 py-0.5 text-xs">{{ $neu['adresse'] }}</code></div>
+                            <div class="mt-1">Schlüssel: <code class="break-all rounded bg-white px-1.5 py-0.5 text-xs">{{ $neu['schluessel'] }}</code></div>
+                            <div class="mt-1 text-xs text-indigo-700">Wird nur jetzt angezeigt. Geht er verloren: Gerät trennen und neu verbinden.</div>
+                        </div>
+                    @endif
+                    <div class="mt-2 divide-y divide-gray-100 text-sm">
+                        @foreach ($geraete as $g)
+                            <div class="flex items-center justify-between gap-3 py-1.5">
+                                <span class="text-gray-800">{{ $g->name }}</span>
+                                <span class="text-xs text-gray-400">{{ $g->zuletzt_am ? 'zuletzt '.$g->zuletzt_am->diffForHumans() : 'noch nie verbunden' }}</span>
+                                <form method="POST" action="{{ route('module.zeiterfassung.meine.geraet.entfernen', $g) }}"
+                                      data-bestaetigen="Das Programm auf diesem Gerät kann danach nicht mehr stempeln." data-titel="„{{ $g->name }}“ trennen?" data-knopf="Trennen">
+                                    @csrf
+                                    <button type="submit" class="rounded-lg px-2 py-1 text-xs text-red-600 hover:bg-red-50">trennen</button>
+                                </form>
+                            </div>
+                        @endforeach
+                    </div>
+                    <form method="POST" action="{{ route('module.zeiterfassung.meine.geraet') }}" class="mt-2 flex flex-wrap gap-2">
+                        @csrf
+                        <input type="text" name="name" required maxlength="150" placeholder="Gerätename, z. B. Laptop Büro" class="min-w-48 flex-1 rounded-lg border-gray-300 text-sm">
+                        <button type="submit" class="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Gerät verbinden</button>
+                    </form>
+                </div>
+            @endif
+
             @if ($verstoesse->isNotEmpty())
                 <div class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
                     <div class="font-semibold">Hinweise zum Arbeitszeitgesetz (letzte 30 Tage)</div>

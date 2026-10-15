@@ -53,7 +53,7 @@ class ZeiterfassungServiceProvider extends ModuleServiceProvider
             ->item('einstellungen', 'Einstellungen', 'module.zeiterfassung.einstellungen.index', icon: 'cog',
                 visibleWhen: fn () => Rechte::istVerwaltung(auth()->user()))
             ->lesend(
-                'meine.stempeln', 'meine.buchung', 'meine.loeschen', 'meine.code',
+                'meine.stempeln', 'meine.buchung', 'meine.loeschen', 'meine.code', 'meine.geraet', 'meine.geraet.entfernen',
                 'abwesenheiten.beantragen', 'abwesenheiten.stornieren',
                 'team.buchung', 'team.loeschen', 'team.stempeln', 'team.modell', 'team.modell.entfernen', 'team.konto',
                 'team.abwesenheit', 'team.abwesenheit.stornieren', 'team.chip', 'team.code', 'team.ausweis.entfernen',

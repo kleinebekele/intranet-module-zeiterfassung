@@ -10,6 +10,8 @@ use Intranet\Modules\Zeiterfassung\Http\Controllers\FreigabeController;
 use Intranet\Modules\Zeiterfassung\Http\Controllers\MeineZeitenController;
 use Intranet\Modules\Zeiterfassung\Http\Controllers\TeamController;
 use Intranet\Modules\Zeiterfassung\Http\Controllers\TerminalController;
+use Intranet\Modules\Zeiterfassung\Http\Controllers\AppController;
+use Intranet\Modules\Zeiterfassung\Http\Middleware\GeraetZugang;
 use Intranet\Modules\Zeiterfassung\Http\Middleware\TerminalZugang;
 
 Route::middleware(['web', 'auth'])
@@ -24,6 +26,8 @@ Route::middleware(['web', 'auth'])
         Route::post('meine/buchung', [MeineZeitenController::class, 'buchung'])->name('meine.buchung');
         Route::post('meine/loeschen', [MeineZeitenController::class, 'loeschen'])->name('meine.loeschen');
         Route::post('meine/code', [MeineZeitenController::class, 'code'])->name('meine.code');
+        Route::post('meine/geraete', [MeineZeitenController::class, 'geraetAnlegen'])->name('meine.geraet');
+        Route::post('meine/geraete/{geraet}/entfernen', [MeineZeitenController::class, 'geraetEntfernen'])->name('meine.geraet.entfernen');
 
         Route::get('abwesenheiten', [AbwesenheitController::class, 'index'])->name('abwesenheiten.index');
         Route::post('abwesenheiten', [AbwesenheitController::class, 'beantragen'])->name('abwesenheiten.beantragen');
@@ -95,4 +99,14 @@ Route::middleware(['web', TerminalZugang::class])
         // Drossel je IP; falsche Codes sperren zusätzlich je Terminal (TerminalController::fehlversuch).
         Route::post('erkennen', [TerminalController::class, 'erkennen'])->middleware('throttle:30,1')->name('erkennen');
         Route::post('buchen', [TerminalController::class, 'buchen'])->middleware('throttle:60,1')->name('buchen');
+    });
+
+// Schnittstelle für das PC-Programm: ohne Sitzung, mit Geräteschlüssel (Authorization: Bearer …).
+Route::middleware([GeraetZugang::class, 'throttle:120,1'])
+    ->prefix('zeit-app/v1')
+    ->name('zeiterfassung.app.')
+    ->group(function () {
+        Route::get('status', [AppController::class, 'status'])->name('status');
+        Route::post('stempeln', [AppController::class, 'stempeln'])->name('stempeln');
+        Route::post('gehen-nachtragen', [AppController::class, 'gehenNachtragen'])->name('gehen');
     });

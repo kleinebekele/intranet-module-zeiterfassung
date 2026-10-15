@@ -4,6 +4,7 @@ namespace Intranet\Modules\Zeiterfassung\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Intranet\Modules\Zeiterfassung\Models\Ausweis;
+use Intranet\Modules\Zeiterfassung\Models\Geraet;
 use Intranet\Modules\Zeiterfassung\Models\Verstoss;
 use Intranet\Modules\Zeiterfassung\Support\Einstellungen;
 use Intranet\Modules\Zeiterfassung\Support\Korrektur;
@@ -28,7 +29,32 @@ class MeineZeitenController
             'nachtrag' => Rechte::nachtragModus($user),
             'verstoesse' => Verstoss::where('user_id', $user->id)->where('datum', '>=', now()->subDays(30))->orderByDesc('datum')->get(),
             'hatCode' => Ausweis::where('user_id', $user->id)->where('art', Ausweis::CODE)->exists(),
+            'geraete' => Geraet::where('user_id', $user->id)->orderBy('name')->get(),
         ]);
+    }
+
+    /** PC-Programm verbinden: Schlüssel wird genau einmal angezeigt. */
+    public function geraetAnlegen(Request $request)
+    {
+        $user = $request->user();
+        abort_unless(Rechte::darfWebStempeln($user), 403, 'Stempeln am PC ist für dich nicht freigeschaltet.');
+        $data = $request->validate(['name' => ['required', 'string', 'max:150']]);
+
+        $token = Geraet::neuesToken();
+        Geraet::create(['user_id' => $user->id, 'name' => $data['name'], 'token_hash' => Geraet::hash($token)]);
+        Korrektur::audit('zeiterfassung.ausweis', "PC-Programm verbunden ({$data['name']})", $user);
+
+        return back()->with('zeit_geraet', ['name' => $data['name'], 'schluessel' => $token, 'adresse' => url('/')]);
+    }
+
+    public function geraetEntfernen(Request $request, Geraet $geraet)
+    {
+        $user = $request->user();
+        abort_unless($geraet->user_id === $user->id, 404);
+        $geraet->delete();
+        Korrektur::audit('zeiterfassung.ausweis', "PC-Programm getrennt ({$geraet->name})", $user);
+
+        return back()->with('status', "Gerät „{$geraet->name}“ getrennt – das Programm dort kann nicht mehr stempeln.");
     }
 
     public function stempeln(Request $request)

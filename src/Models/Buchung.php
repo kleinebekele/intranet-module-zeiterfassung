@@ -40,6 +40,7 @@ class Buchung extends Model
         'web' => 'Intranet',
         'nachtrag' => 'Nachtrag',
         'leitung' => 'Leitung',
+        'app' => 'PC-Programm',
     ];
 
     protected $guarded = ['id'];
