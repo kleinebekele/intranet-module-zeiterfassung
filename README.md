@@ -56,6 +56,7 @@ Voraussetzung: Rolle `zeit-homeoffice` (Stempeln im Intranet) bzw. Verwaltung. S
 | `GET zeit-app/v1/status` | Zustand, heutige Arbeitszeit, Soll, Kernzeit, Schicht laut Dienstplan, Regeln |
 | `POST zeit-app/v1/stempeln` | `aktion` = kommen, pause, weiter, gehen |
 | `POST zeit-app/v1/gehen-nachtragen` | `zeit` (ISO 8601), `laut_geraet` (0/1), optional `notiz` |
+| `GET zeit-app/v1/programm` | die aktuelle `Zeiterfassung.exe` (automatisches Update; Version + SHA-256 stehen im Status) |
 
 ## Dienstplan-Vorschlag
 
