@@ -10,6 +10,8 @@ package main
 import (
 	"errors"
 	"fmt"
+	"os"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -19,11 +21,24 @@ import (
 	"github.com/ncruces/zenity"
 )
 
-const Version = "1.0.1"
+// Version setzt bauen.ps1 aus der Datei VERSION (-ldflags -X main.Version=…).
+var Version = "dev"
 
 const titel = "Zeiterfassung"
 
 func main() {
+	nachUpdate := slices.Contains(os.Args[1:], nachUpdateSchalter)
+	if nachUpdate {
+		// Neustart nach dem automatischen Update: warten, bis die alte Version beendet ist.
+		for n := 0; n < 30 && !einzigeInstanz(); n++ {
+			time.Sleep(500 * time.Millisecond)
+		}
+		go aufraeumenNachUpdate()
+		a := &App{spaeter: map[string]time.Time{}, erledigt: map[string]string{}, nachUpdate: true}
+		systray.Run(a.bereit, func() {})
+		return
+	}
+
 	// Aus „Downloads" gestartet? Dann an den festen Ort kopieren und von dort starten.
 	neu, err := installiereBeiBedarf()
 	if neu {
@@ -56,6 +71,9 @@ type App struct {
 	spaeter    map[string]time.Time // Erinnerung ruht bis …
 	erledigt   map[string]string    // Erinnerung für diesen Tag erledigt (Datum)
 	startOffen atomic.Bool          // „Später" bei der Startfrage gewählt
+
+	updateLaeuft atomic.Bool
+	nachUpdate   bool
 
 	mStatus, mKommen, mPause, mWeiter, mGehen, mOeffnen, mVerbindung, mAutostart, mBeenden *systray.MenuItem
 }
@@ -154,7 +172,12 @@ func (a *App) start() {
 	protokoll("Start, Version " + Version)
 
 	a.aktualisieren()
-	a.startfragen(beat, beatOk)
+	if a.nachUpdate {
+		// Nach dem Update nichts fragen – es war ja nur ein Neustart im laufenden Betrieb.
+		meldeUpdate()
+	} else {
+		a.startfragen(beat, beatOk)
+	}
 
 	takt := time.NewTicker(time.Minute)
 	for t := range takt.C {
@@ -523,6 +546,7 @@ func (a *App) aktualisieren() {
 	if err == nil {
 		a.status = s
 		a.geholtAm = time.Now()
+		defer a.updatePruefen(s)
 	} else {
 		protokoll("Status: " + err.Error())
 		var h Hinweis

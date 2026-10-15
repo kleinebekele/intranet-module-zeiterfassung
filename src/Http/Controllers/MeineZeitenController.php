@@ -49,6 +49,24 @@ class MeineZeitenController
         return dirname(__DIR__, 3).'/resources/programm/Zeiterfassung.exe';
     }
 
+    /**
+     * Version und Prüfsumme des mitgelieferten Programms (schreibt programm/bauen.ps1) – für das
+     * automatische Update. Null, wenn die Angaben fehlen oder nicht zur Datei passen.
+     *
+     * @return array{version: string, sha256: string}|null
+     */
+    public static function programmInfo(): ?array
+    {
+        $datei = dirname(self::programmDatei()).'/version.json';
+        // BOM abschneiden, falls ein Editor eins hineingeschrieben hat.
+        $info = is_file($datei) ? json_decode(preg_replace('/^\xEF\xBB\xBF/', '', (string) file_get_contents($datei)), true) : null;
+        if (! is_array($info) || empty($info['version']) || empty($info['sha256']) || ! is_file(self::programmDatei())) {
+            return null;
+        }
+
+        return ['version' => (string) $info['version'], 'sha256' => strtolower((string) $info['sha256'])];
+    }
+
     /** PC-Programm verbinden: Schlüssel wird genau einmal angezeigt. */
     public function geraetAnlegen(Request $request)
     {

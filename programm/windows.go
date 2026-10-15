@@ -17,8 +17,14 @@ const autostartName = "Zeiterfassung"
 // Nur eine Instanz je Benutzer. Der Mutex bleibt bis zum Programmende offen.
 func einzigeInstanz() bool {
 	name, _ := windows.UTF16PtrFromString(`Local\Zeiterfassung-PC`)
-	_, err := windows.CreateMutex(nil, false, name)
-	return err != windows.ERROR_ALREADY_EXISTS
+	h, err := windows.CreateMutex(nil, false, name)
+	if err == windows.ERROR_ALREADY_EXISTS {
+		// Handle schließen – sonst hielte er den Mutex am Leben und ein späterer Versuch
+		// (Neustart nach Update) würde ewig „läuft bereits" sehen.
+		_ = windows.CloseHandle(h)
+		return false
+	}
+	return true
 }
 
 // Zielort ohne Adminrechte: %LOCALAPPDATA%\Programs\Zeiterfassung\Zeiterfassung.exe

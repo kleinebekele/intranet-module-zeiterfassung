@@ -26,6 +26,18 @@ func TestSchnittstelle(t *testing.T) {
 	}
 	t.Logf("Status: %s, %s, heute %d Min., Soll %d, Kern %+v, Regeln %+v", s.Person, s.Zustand, s.HeuteMinuten, s.SollHeute, s.Kern, s.Regeln)
 
+	if s.Programm == nil {
+		t.Fatal("Status meldet keine Programmversion")
+	}
+	ziel := t.TempDir() + "/neu.exe"
+	if err := i.ladeProgramm(ziel, s.Programm.Sha256); err != nil {
+		t.Fatal("Update-Download:", err)
+	}
+	if err := i.ladeProgramm(ziel, "falsch"); err == nil {
+		t.Fatal("falsche Prüfsumme wurde nicht erkannt")
+	}
+	t.Logf("Update: Version %s geladen, Prüfsumme stimmt; neuer als dev: %v", s.Programm.Version, neuer(s.Programm.Version, "dev"))
+
 	m, err := i.Stempeln("kommen")
 	t.Log("Kommen:", m, err)
 	_, err = i.Stempeln("kommen")
@@ -74,6 +86,23 @@ func TestZerlegeCode(t *testing.T) {
 		a, s := zerlegeCode(code)
 		if a != erwartet[0] || s != erwartet[1] {
 			t.Errorf("%q → %q, %q", code, a, s)
+		}
+	}
+}
+
+func TestNeuer(t *testing.T) {
+	for _, f := range []struct {
+		a, b string
+		neu  bool
+	}{
+		{"1.1.0", "1.0.1", true},
+		{"1.2.10", "1.2.9", true},
+		{"1.0.1", "1.1.0", false},
+		{"1.1.0", "1.1.0", false},
+		{"1.1.0", "dev", true},
+	} {
+		if neuer(f.a, f.b) != f.neu {
+			t.Errorf("neuer(%s, %s) sollte %v sein", f.a, f.b, f.neu)
 		}
 	}
 }

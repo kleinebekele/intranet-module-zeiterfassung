@@ -30,7 +30,8 @@ type Status struct {
 		MaxBlock int `json:"max_block"`
 		MaxTag   int `json:"max_tag"`
 	} `json:"regeln"`
-	Nachtrag string `json:"nachtrag"`
+	Nachtrag string        `json:"nachtrag"`
+	Programm *ProgrammInfo `json:"programm"`
 }
 
 type Zeitraum struct {

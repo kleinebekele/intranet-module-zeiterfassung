@@ -55,8 +55,20 @@ class AppController
                 'max_tag' => Einstellungen::int('max_tag'),
             ],
             'nachtrag' => Rechte::nachtragModus($user), // frei | antrag | null
+            'programm' => MeineZeitenController::programmInfo(), // neueste Version für das automatische Update
             'server_zeit' => $jetzt->toIso8601String(),
         ]);
+    }
+
+    /** Das Programm selbst – für das automatische Update. */
+    public function programm()
+    {
+        $datei = MeineZeitenController::programmDatei();
+        if (! is_file($datei)) {
+            return response()->json(['ok' => false, 'meldung' => 'Kein Programm vorhanden.'], 404);
+        }
+
+        return response()->download($datei, 'Zeiterfassung.exe', ['Content-Type' => 'application/octet-stream']);
     }
 
     public function stempeln(Request $request): JsonResponse
