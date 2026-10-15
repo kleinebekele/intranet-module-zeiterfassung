@@ -70,7 +70,7 @@ Status (`clearUserPreferredPresence`). Im PC-Programm lässt sich zur Pause eine
 Terminal, im Intranet oder im PC-Programm gebucht. Stellt die Person Teams selbst auf „Als offline anzeigen“ bzw. wieder
 auf verfügbar, fragt das PC-Programm, ob die Arbeitszeit enden bzw. beginnen soll.
 
-**Statusvorlagen** (je Person, unter Meine Zeiten → Teams): Name, Dauer 15–300 Min., Teams-Status (Nicht stören,
+**Statusvorlagen** (je Person, unter Meine Zeiten → Teams): Name, Dauer 5 Min. oder 15–300 Min., Teams-Status (Nicht stören,
 Beschäftigt, Abwesend, Bin gleich zurück, Offline), Statustext, zurück auf online automatisch oder nach Rückfrage, optional
 zugleich Pause buchen. Im PC-Programm per Rechtsklick → „Statusvorlagen“ (`zeit-app/v1/vorlage`, `status-zuruecksetzen`).
 

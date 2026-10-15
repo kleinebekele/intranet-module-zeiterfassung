@@ -23,6 +23,12 @@ class Statusvorlage extends Model
         'Offline' => ['Offline', 'OffWork'],
     ];
 
+    /** Wählbare Dauern in Minuten: 5 (kurzes Telefonat) und 15 bis 300 in 15er-Schritten. */
+    public static function dauern(): array
+    {
+        return [5, ...range(15, 300, 15)];
+    }
+
     public const RUECKKEHR = [
         'frage' => 'nach Rückfrage',
         'automatisch' => 'automatisch',

@@ -6,9 +6,9 @@
         <input type="text" name="name" required maxlength="100" value="{{ $v?->name }}" placeholder="z. B. Mittagspause" class="mt-1 w-full rounded-lg border-gray-300 text-sm"></label>
     <label class="block text-xs"><span class="text-gray-500">Dauer</span>
         <select name="minuten" class="mt-1 w-full rounded-lg border-gray-300 text-sm">
-            @for ($m = 15; $m <= 300; $m += 15)
+            @foreach (\Intranet\Modules\Zeiterfassung\Models\Statusvorlage::dauern() as $m)
                 <option value="{{ $m }}" @selected(($v?->minuten ?? 30) === $m)>{{ intdiv($m, 60) ? intdiv($m, 60).' Std.'.($m % 60 ? ' '.($m % 60).' Min.' : '') : $m.' Min.' }}</option>
-            @endfor
+            @endforeach
         </select></label>
     <label class="block text-xs"><span class="text-gray-500">Teams-Status</span>
         <select name="verfuegbarkeit" class="mt-1 w-full rounded-lg border-gray-300 text-sm">

@@ -14,7 +14,7 @@ sonst Tagessoll, sonst Ende der Kernzeit) und die Höchstarbeitszeit – gebucht
 - **Pause:** Fenster mit 15/30/45/60 Min. und – bei gekoppeltem Teams – Statusnachricht. Nach der gewählten Dauer
   fragt das Programm nur „Pause beenden?“; ohne Antwort bleibt es Pause (nichts wird automatisch gebucht).
 - **Statusvorlagen:** Rechtsklick → „Statusvorlagen“ zeigt die eigenen Vorlagen aus dem Intranet (Meine Zeiten → Teams):
-  Teams-Status + Text für 15–300 Min., danach automatisch zurück oder nach Rückfrage; optional zugleich Pause buchen.
+  Teams-Status + Text für 5 Min. oder 15–300 Min., danach automatisch zurück oder nach Rückfrage; optional zugleich Pause buchen.
   „Teams wieder auf Verfügbar“ beendet eine Vorlage vorzeitig.
 - **Höchstarbeitszeit (10 Std.):** Fenster „Feierabend (Gehen buchen)“ oder „Pause vergessen“ – dann Dauer (15–300 Min.)
   und Beginn wählen, die Pause wird nachgetragen und es geht weiter.

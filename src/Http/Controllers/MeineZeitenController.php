@@ -105,7 +105,7 @@ class MeineZeitenController
         $data = $request->validate([
             'id' => ['nullable', 'integer'],
             'name' => ['required', 'string', 'max:100'],
-            'minuten' => ['required', 'integer', 'min:15', 'max:300', 'multiple_of:15'],
+            'minuten' => ['required', 'integer', 'in:'.implode(',', Statusvorlage::dauern())],
             'verfuegbarkeit' => ['required', 'in:'.implode(',', array_keys(Statusvorlage::STATUS))],
             'text' => ['nullable', 'string', 'max:280'],
             'rueckkehr' => ['required', 'in:'.implode(',', array_keys(Statusvorlage::RUECKKEHR))],
