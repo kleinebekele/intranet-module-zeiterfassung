@@ -109,7 +109,9 @@ func TestNeuer(t *testing.T) {
 
 func TestTeamsWechsel(t *testing.T) {
 	a := &App{}
-	st := func(teams, zustand string) *Status { return &Status{Zustand: zustand, Teams: &TeamsInfo{Verfuegbarkeit: teams}} }
+	st := func(teams, zustand string) *Status {
+		return &Status{Zustand: zustand, Teams: &TeamsInfo{Verfuegbarkeit: teams}}
+	}
 	if w := a.teamsWechsel(st("Available", "da")); w != "" {
 		t.Fatal("erster Wert darf nichts auslösen:", w)
 	}

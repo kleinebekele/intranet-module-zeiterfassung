@@ -116,9 +116,15 @@ func (i *Intranet) Status() (*Status, error) {
 	return &s, nil
 }
 
-func (i *Intranet) Stempeln(aktion string) (string, error) {
+func (i *Intranet) Stempeln(aktion string, extra ...url.Values) (string, error) {
+	daten := url.Values{"aktion": {aktion}}
+	for _, e := range extra {
+		for k, v := range e {
+			daten[k] = v
+		}
+	}
 	var a antwort
-	err := i.anfrage("POST", "stempeln", url.Values{"aktion": {aktion}}, &a)
+	err := i.anfrage("POST", "stempeln", daten, &a)
 	return a.Meldung, err
 }
 

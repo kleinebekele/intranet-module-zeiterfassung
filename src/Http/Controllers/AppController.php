@@ -132,8 +132,11 @@ class AppController
             return response()->json(['ok' => false, 'meldung' => 'Unbekannte Aktion.'], 422);
         }
 
+        // Zur Pause optional eine Teams-Statusnachricht (aus dem Pausenfenster des Programms).
+        $teams = $aktion === 'pause' ? array_filter(['nachricht' => mb_substr(trim((string) $request->input('nachricht')), 0, 280)]) : [];
+
         try {
-            Stempeluhr::buchen($request->user(), $aktion, 'app');
+            Stempeluhr::buchen($request->user(), $aktion, 'app', null, $teams);
         } catch (RuntimeException $e) {
             return response()->json(['ok' => false, 'meldung' => $e->getMessage()], 409);
         }

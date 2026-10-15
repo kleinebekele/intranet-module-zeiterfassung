@@ -65,7 +65,8 @@ Voraussetzung: Rolle `zeit-homeoffice` (Stempeln im Intranet) bzw. Verwaltung. S
 Freiwillig je Person unter „Meine Zeiten → Teams koppeln“: Die Person stimmt mit ihrem Microsoft-Konto der delegierten
 Berechtigung `Presence.ReadWrite` zu (nur der eigene Status). Danach stellt **Gehen** Teams auf „Offline“
 (`setUserPreferredPresence`), **Pause** auf „Bin gleich zurück“, **Kommen** bzw. Pause beenden zurück auf den automatischen
-Status (`clearUserPreferredPresence`) – egal ob am
+Status (`clearUserPreferredPresence`). Im PC-Programm lässt sich zur Pause eine Teams-Statusnachricht mitgeben
+(`setStatusMessage`); sie bleibt wie „Bin gleich zurück“ bis zum Pausenende stehen und wird dann entfernt – egal ob am
 Terminal, im Intranet oder im PC-Programm gebucht. Stellt die Person Teams selbst auf „Als offline anzeigen“ bzw. wieder
 auf verfügbar, fragt das PC-Programm, ob die Arbeitszeit enden bzw. beginnen soll.
 

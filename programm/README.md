@@ -11,6 +11,8 @@ sonst Tagessoll, sonst Ende der Kernzeit) und die Höchstarbeitszeit – gebucht
   `lebenszeichen.txt` jede Minute, `abwesend-seit.txt` beim Sperren) und bucht nichts. Beim Zurückkommen:
   unter 15 Min. nichts (bleibt Arbeitszeit), ab 15 Min. „War das eine Pause?“ (Ja → Pause rückwirkend), ab 2 Std.
   „Arbeitsende um …?“. Solange gesperrt, keine Erinnerungen. „Beenden“ über das Menü fragt nach „Gehen“.
+- **Pause:** Fenster mit 15/30/45/60 Min. und – bei gekoppeltem Teams – Statusnachricht. Nach der gewählten Dauer
+  fragt das Programm nur „Pause beenden?“; ohne Antwort bleibt es Pause (nichts wird automatisch gebucht).
 - **Teams:** Ist Teams unter „Meine Zeiten“ gekoppelt, fragt das Programm bei einem Wechsel auf „Offline“ (während
   eingestempelt) nach dem Arbeitsende und beim Wechsel zurück auf online nach dem Arbeitsbeginn.
 - **Protokoll:** `%APPDATA%\Zeiterfassung\protokoll.txt` (Fehlersuche).

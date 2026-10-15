@@ -76,6 +76,7 @@ type App struct {
 	nachUpdate   bool
 	abwesend     time.Time // Beginn der aktuellen Abwesenheit vom Rechner (unter merkerMu)
 	teamsVorher  string    // letzte gesehene Teams-Verfügbarkeit (unter mu)
+	pauseBis     time.Time // geplantes Pausenende aus dem Pausenfenster (unter merkerMu)
 
 	mStatus, mKommen, mPause, mWeiter, mGehen, mOeffnen, mVerbindung, mAutostart, mBeenden *systray.MenuItem
 }
@@ -112,7 +113,7 @@ func (a *App) klicks() {
 		case <-a.mKommen.ClickedCh:
 			go a.stempeln("kommen")
 		case <-a.mPause.ClickedCh:
-			go a.stempeln("pause")
+			go a.pauseStarten()
 		case <-a.mWeiter.ClickedCh:
 			go a.stempeln("weiter")
 		case <-a.mGehen.ClickedCh:
@@ -344,9 +345,16 @@ func (a *App) erinnern() {
 		}
 
 	case "pause":
+		// Nach der geplanten Dauer (sonst 30 Min.) nur fragen – ohne Antwort bleibt es Pause.
 		seit, err := time.Parse(time.RFC3339, s.Seit)
-		if err == nil && jetzt.Sub(seit) >= 30*time.Minute && a.faellig("weiter") {
-			go a.erinnerung("weiter", "Deine Pause läuft seit "+dauer(int(jetzt.Sub(seit).Minutes()))+" Std.\n\nWeiter arbeiten?", "Pause beenden", 10*time.Minute, "weiter")
+		ende := seit.Add(30 * time.Minute)
+		a.merkerMu.Lock()
+		if !a.pauseBis.IsZero() && a.pauseBis.After(seit) {
+			ende = a.pauseBis
+		}
+		a.merkerMu.Unlock()
+		if err == nil && !jetzt.Before(ende) && a.faellig("weiter") {
+			go a.erinnerung("weiter", "Deine Pause läuft seit "+dauer(int(jetzt.Sub(seit).Minutes()))+" Std.\n\nPause beenden und weiter arbeiten?", "Pause beenden", 10*time.Minute, "weiter")
 		}
 
 	case "da":
@@ -442,7 +450,11 @@ func (a *App) erinnerung(schluessel, text, ja string, ruhe time.Duration, aktion
 		return
 	}
 	if a.frage(text, ja, "Später", "") == antwortJa {
-		a.stempeln(aktion)
+		if aktion == "pause" {
+			a.pauseStarten()
+		} else {
+			a.stempeln(aktion)
+		}
 		return
 	}
 	a.ruhe(schluessel, ruhe)

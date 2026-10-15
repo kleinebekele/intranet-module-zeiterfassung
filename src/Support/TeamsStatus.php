@@ -151,24 +151,40 @@ class TeamsStatus
      * Nach einer Buchung: Gehen → Offline, Pause → „Bin gleich zurück", Kommen und Pause
      * beenden → automatischer Status. Fehler werden nur gemerkt.
      */
-    public static function nachBuchung(User $user, string $aktion): void
+    public static function nachBuchung(User $user, string $aktion, array $optionen = []): void
     {
         if (! array_key_exists($aktion, self::NACH_AKTION) || ! self::gekoppelt($user)) {
             return;
         }
         try {
+            // Kein Ablauf: „Bin gleich zurück" und die Nachricht bleiben, bis die Pause wirklich beendet
+            // wird – endet sie nicht, ist man eben noch in der Pause.
             $status = self::NACH_AKTION[$aktion];
-            $pfad = $status ? 'setUserPreferredPresence' : 'clearUserPreferredPresence';
-            $daten = $status ?? (object) [];
-            $antwort = Http::withToken(self::zugriffsToken($user))->timeout(8)
-                ->post('https://graph.microsoft.com/v1.0/me/presence/'.$pfad, $daten);
-            if ($antwort->failed()) {
-                throw new RuntimeException('Teams-Status nicht gesetzt (HTTP '.$antwort->status().': '.($antwort->json('error.message') ?: '').')');
+            self::graph($user, $status ? 'setUserPreferredPresence' : 'clearUserPreferredPresence', $status ?? (object) []);
+
+            // Statusnachricht zur Pause; beim Weiterarbeiten nur entfernen, wenn sie von uns stammt.
+            $merker = 'zeit-teams-nachricht-'.$user->id;
+            $nachricht = trim((string) ($optionen['nachricht'] ?? ''));
+            if ($aktion === 'pause' && $nachricht !== '') {
+                self::graph($user, 'setStatusMessage', ['statusMessage' => ['message' => ['content' => $nachricht, 'contentType' => 'text']]]);
+                Cache::put($merker, true, now()->addDay());
+            } elseif ($aktion !== 'pause' && Cache::pull($merker)) {
+                self::graph($user, 'setStatusMessage', ['statusMessage' => ['message' => ['content' => '', 'contentType' => 'text']]]);
             }
             Cache::forget(self::cacheStatus($user));
             DB::table('zeit_teams')->where('user_id', $user->id)->update(['letzter_fehler' => null]);
         } catch (Throwable $e) {
             self::fehlerMerken($user, $e->getMessage());
+        }
+    }
+
+    /** POST auf /me/presence/{aktion}; wirft bei Fehler. */
+    private static function graph(User $user, string $aktion, array|object $daten): void
+    {
+        $antwort = Http::withToken(self::zugriffsToken($user))->timeout(8)
+            ->post('https://graph.microsoft.com/v1.0/me/presence/'.$aktion, $daten);
+        if ($antwort->failed()) {
+            throw new RuntimeException('Teams: '.$aktion.' fehlgeschlagen (HTTP '.$antwort->status().': '.($antwort->json('error.message') ?: '').')');
         }
     }
 

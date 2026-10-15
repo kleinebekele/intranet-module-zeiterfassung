@@ -65,7 +65,10 @@ class Stempeluhr
      * Führt eine Aktion aus. Wirft RuntimeException mit Klartext, wenn sie im
      * aktuellen Zustand keinen Sinn ergibt (doppelt gedrückt …).
      */
-    public static function buchen(User $user, string $aktion, string $quelle, ?int $terminalId = null): Buchung
+    /**
+     * @param  array{nachricht?: string}  $teams  Teams-Statusnachricht zur Pause
+     */
+    public static function buchen(User $user, string $aktion, string $quelle, ?int $terminalId = null, array $teams = []): Buchung
     {
         $buchung = DB::transaction(function () use ($user, $aktion, $quelle, $terminalId) {
             // Sperre gegen Doppelklick: zwei Anfragen gleichzeitig dürfen nicht zwei Abschnitte öffnen.
@@ -112,7 +115,7 @@ class Stempeluhr
         });
 
         // Teams-Status mitziehen (nur bei Kopplung; Fehler bremsen die Buchung nicht).
-        TeamsStatus::nachBuchung($user, $aktion);
+        TeamsStatus::nachBuchung($user, $aktion, $teams);
 
         return $buchung;
     }
