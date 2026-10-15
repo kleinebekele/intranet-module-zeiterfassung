@@ -1,11 +1,13 @@
-{{-- Statuskarte mit Kommen/Pause/Gehen. Erwartet: $status, $route (Formularziel), $darfStempeln --}}
+{{-- Statuskarte mit Kommen/Pause/Gehen. Erwartet: $status, $route (Formularziel), $darfStempeln;
+     optional $kacheln = true: zwei einzelne Kacheln (Status | Knöpfe) für ein umgebendes Raster. --}}
 @php
     $farbe = ['da' => 'bg-green-500', 'pause' => 'bg-amber-400', 'weg' => 'bg-gray-300'][$status['zustand']];
     $text = ['da' => 'Anwesend', 'pause' => 'In der Pause', 'weg' => 'Nicht eingestempelt'][$status['zustand']];
     $maxBlock = \Intranet\Modules\Zeiterfassung\Support\Einstellungen::int('max_block');
 @endphp
-<div class="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white p-5">
-    <div class="flex items-center gap-4">
+@php $kacheln = $kacheln ?? false; @endphp
+@if (! $kacheln)<div class="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white p-5">@endif
+    <div class="flex items-center gap-4 {{ $kacheln ? 'rounded-xl border border-gray-200 bg-white p-4' : '' }}">
         <span class="relative flex h-4 w-4">
             @if ($status['zustand'] === 'da')
                 <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-60"></span>
@@ -26,7 +28,7 @@
     </div>
 
     @if ($darfStempeln)
-        <form method="POST" action="{{ $route }}" class="flex flex-wrap gap-2">
+        <form method="POST" action="{{ $route }}" class="flex flex-wrap gap-2 {{ $kacheln ? 'items-center justify-center rounded-xl border border-gray-200 bg-white p-4' : '' }}">
             @csrf
             @foreach ($status['aktionen'] as $aktion)
                 <button type="submit" name="aktion" value="{{ $aktion }}"
@@ -36,5 +38,7 @@
                 </button>
             @endforeach
         </form>
+    @elseif ($kacheln)
+        <div class="flex items-center rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-500">Stempeln am Terminal mit Chip oder Code.</div>
     @endif
-</div>
+@if (! $kacheln)</div>@endif
