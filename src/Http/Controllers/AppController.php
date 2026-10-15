@@ -14,6 +14,7 @@ use Intranet\Modules\Zeiterfassung\Support\Einstellungen;
 use Intranet\Modules\Zeiterfassung\Support\Korrektur;
 use Intranet\Modules\Zeiterfassung\Support\Rechte;
 use Intranet\Modules\Zeiterfassung\Support\Stempeluhr;
+use Intranet\Modules\Zeiterfassung\Support\TeamsStatus;
 use RuntimeException;
 
 /**
@@ -58,6 +59,8 @@ class AppController
             ],
             'nachtrag' => Rechte::nachtragModus($user), // frei | antrag | null
             'programm' => MeineZeitenController::programmInfo(), // neueste Version für das automatische Update
+            // Teams-Status (nur bei Kopplung): Das Programm fragt bei einem Wechsel nach.
+            'teams' => TeamsStatus::lesen($user),
             'server_zeit' => $jetzt->toIso8601String(),
         ]);
     }
@@ -172,6 +175,7 @@ class AppController
         } catch (RuntimeException $e) {
             return response()->json(['ok' => false, 'meldung' => $e->getMessage()], 409);
         }
+        TeamsStatus::nachBuchung($user, 'gehen');
 
         return response()->json(['ok' => true, 'meldung' => 'Gehen um '.$ende->format('H:i').' Uhr eingetragen.']);
     }

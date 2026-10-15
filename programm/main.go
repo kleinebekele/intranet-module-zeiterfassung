@@ -75,6 +75,7 @@ type App struct {
 	updateLaeuft atomic.Bool
 	nachUpdate   bool
 	abwesend     time.Time // Beginn der aktuellen Abwesenheit vom Rechner (unter merkerMu)
+	teamsVorher  string    // letzte gesehene Teams-Verfügbarkeit (unter mu)
 
 	mStatus, mKommen, mPause, mWeiter, mGehen, mOeffnen, mVerbindung, mAutostart, mBeenden *systray.MenuItem
 }
@@ -317,7 +318,7 @@ func (a *App) takt(t time.Time) {
 		return
 	}
 
-	if t.Sub(a.geholtAm) >= 5*time.Minute || a.aktuell() == nil {
+	if t.Sub(a.geholtAm) >= 2*time.Minute || a.aktuell() == nil {
 		a.aktualisieren()
 	}
 	a.erinnern()
@@ -564,6 +565,9 @@ func (a *App) aktualisieren() {
 		a.status = s
 		a.geholtAm = time.Now()
 		defer a.updatePruefen(s)
+		if wechsel := a.teamsWechsel(s); wechsel != "" {
+			defer func() { go a.teamsNachfragen(wechsel) }()
+		}
 	} else {
 		protokoll("Status: " + err.Error())
 		var h Hinweis

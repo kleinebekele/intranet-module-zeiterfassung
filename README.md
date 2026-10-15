@@ -60,6 +60,17 @@ Voraussetzung: Rolle `zeit-homeoffice` (Stempeln im Intranet) bzw. Verwaltung. S
 | `POST zeit-app/v1/pause-nachtragen` | `von`, `bis` (ISO 8601) – Abschnitt endet am Pausenbeginn, neuer beginnt am Ende |
 | `GET zeit-app/v1/programm` | die aktuelle `Zeiterfassung.exe` (automatisches Update; Version + SHA-256 stehen im Status) |
 
+## Teams-Status (nur mit Microsoft-Anmeldung)
+
+Freiwillig je Person unter „Meine Zeiten → Teams koppeln“: Die Person stimmt mit ihrem Microsoft-Konto der delegierten
+Berechtigung `Presence.ReadWrite` zu (nur der eigene Status). Danach stellt **Gehen** Teams auf „Offline“
+(`setUserPreferredPresence`) und **Kommen** zurück auf den automatischen Status (`clearUserPreferredPresence`) – egal ob am
+Terminal, im Intranet oder im PC-Programm gebucht. Stellt die Person Teams selbst auf „Als offline anzeigen“ bzw. wieder
+auf verfügbar, fragt das PC-Programm, ob die Arbeitszeit enden bzw. beginnen soll.
+
+Einrichtung in der Entra-App (dieselbe wie die Microsoft-Anmeldung): delegierte Berechtigung **Presence.ReadWrite** und
+Umleitungs-URI `{APP_URL}/modules/zeiterfassung/meine/teams/zurueck`. Der Refresh-Token liegt verschlüsselt in `zeit_teams`.
+
 ## Dienstplan-Vorschlag
 
 Soll je Tag aus dem Zeitmodell bzw. den Wochenstunden. Feiertage und Abwesenheiten werden gutgeschrieben (mindern

@@ -106,3 +106,23 @@ func TestNeuer(t *testing.T) {
 		}
 	}
 }
+
+func TestTeamsWechsel(t *testing.T) {
+	a := &App{}
+	st := func(teams, zustand string) *Status { return &Status{Zustand: zustand, Teams: &TeamsInfo{Verfuegbarkeit: teams}} }
+	if w := a.teamsWechsel(st("Available", "da")); w != "" {
+		t.Fatal("erster Wert darf nichts auslösen:", w)
+	}
+	if w := a.teamsWechsel(st("Offline", "da")); w != "offline" {
+		t.Fatal("Wechsel auf offline während da:", w)
+	}
+	if w := a.teamsWechsel(st("Offline", "da")); w != "" {
+		t.Fatal("kein zweites Mal:", w)
+	}
+	if w := a.teamsWechsel(st("Available", "weg")); w != "online" {
+		t.Fatal("Wechsel auf online während weg:", w)
+	}
+	if w := a.teamsWechsel(st("Offline", "weg")); w != "" {
+		t.Fatal("offline während weg: nichts zu fragen:", w)
+	}
+}

@@ -32,6 +32,12 @@ type Status struct {
 	} `json:"regeln"`
 	Nachtrag string        `json:"nachtrag"`
 	Programm *ProgrammInfo `json:"programm"`
+	Teams    *TeamsInfo    `json:"teams"` // nur bei Kopplung
+}
+
+type TeamsInfo struct {
+	Verfuegbarkeit string `json:"verfuegbarkeit"` // Available, Busy, Away, Offline …
+	Aktivitaet     string `json:"aktivitaet"`
 }
 
 type Zeitraum struct {

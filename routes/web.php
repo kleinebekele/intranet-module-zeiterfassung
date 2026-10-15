@@ -27,6 +27,9 @@ Route::middleware(['web', 'auth'])
         Route::post('meine/loeschen', [MeineZeitenController::class, 'loeschen'])->name('meine.loeschen');
         Route::post('meine/code', [MeineZeitenController::class, 'code'])->name('meine.code');
         Route::get('meine/programm', [MeineZeitenController::class, 'programm'])->name('meine.programm');
+        Route::get('meine/teams', [MeineZeitenController::class, 'teamsStart'])->name('meine.teams');
+        Route::get('meine/teams/zurueck', [MeineZeitenController::class, 'teamsZurueck'])->name('meine.teams.zurueck');
+        Route::post('meine/teams/trennen', [MeineZeitenController::class, 'teamsTrennen'])->name('meine.teams.trennen');
         Route::post('meine/geraete', [MeineZeitenController::class, 'geraetAnlegen'])->name('meine.geraet');
         Route::post('meine/geraete/{geraet}/entfernen', [MeineZeitenController::class, 'geraetEntfernen'])->name('meine.geraet.entfernen');
 

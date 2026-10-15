@@ -10,6 +10,7 @@ use Intranet\Modules\Zeiterfassung\Support\Einstellungen;
 use Intranet\Modules\Zeiterfassung\Support\Korrektur;
 use Intranet\Modules\Zeiterfassung\Support\Rechte;
 use Intranet\Modules\Zeiterfassung\Support\Stempeluhr;
+use Intranet\Modules\Zeiterfassung\Support\TeamsStatus;
 use RuntimeException;
 
 /** Die eigene Seite: Stempeluhr (Homeoffice), Monatsübersicht, Nachträge. */
@@ -31,6 +32,10 @@ class MeineZeitenController
             'hatCode' => Ausweis::where('user_id', $user->id)->where('art', Ausweis::CODE)->exists(),
             'geraete' => Geraet::where('user_id', $user->id)->orderBy('name')->get(),
             'programmDa' => is_file(self::programmDatei()),
+            'teamsMoeglich' => TeamsStatus::moeglich(),
+            'teamsGekoppelt' => TeamsStatus::gekoppelt($user),
+            'teamsKonto' => TeamsStatus::konto($user),
+            'teamsFehler' => TeamsStatus::letzterFehler($user),
         ]);
     }
 
@@ -65,6 +70,38 @@ class MeineZeitenController
         }
 
         return ['version' => (string) $info['version'], 'sha256' => strtolower((string) $info['sha256'])];
+    }
+
+    /** Teams-Status koppeln: weiter zur Microsoft-Anmeldung (nur eigener Status, Presence.ReadWrite). */
+    public function teamsStart(Request $request)
+    {
+        abort_unless(TeamsStatus::moeglich() && Rechte::istTeilnehmer($request->user()), 404);
+
+        return redirect()->away(TeamsStatus::startUrl($request));
+    }
+
+    public function teamsZurueck(Request $request)
+    {
+        $user = $request->user();
+        abort_unless(TeamsStatus::moeglich() && Rechte::istTeilnehmer($user), 404);
+        try {
+            TeamsStatus::abschliessen($request, $user);
+        } catch (RuntimeException $e) {
+            return redirect()->route('module.zeiterfassung.meine.index')->with('error', $e->getMessage());
+        }
+        Korrektur::audit('zeiterfassung.ausweis', 'Teams-Status gekoppelt', $user);
+
+        return redirect()->route('module.zeiterfassung.meine.index')
+            ->with('status', 'Teams ist gekoppelt: Gehen stellt Teams auf offline, Kommen wieder auf verfügbar.');
+    }
+
+    public function teamsTrennen(Request $request)
+    {
+        $user = $request->user();
+        TeamsStatus::trennen($user);
+        Korrektur::audit('zeiterfassung.ausweis', 'Teams-Status entkoppelt', $user);
+
+        return back()->with('status', 'Teams ist entkoppelt.');
     }
 
     /** PC-Programm verbinden: Schlüssel wird genau einmal angezeigt. */

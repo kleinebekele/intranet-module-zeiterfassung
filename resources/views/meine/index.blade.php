@@ -109,6 +109,35 @@
                 </div>
             @endif
 
+            @if ($teamsMoeglich && $teilnehmer)
+                <div class="rounded-xl border border-gray-200 bg-white p-4">
+                    <div class="flex flex-wrap items-baseline justify-between gap-2">
+                        <div class="text-xs uppercase tracking-wide text-gray-400">Teams-Status</div>
+                        <span class="text-xs text-gray-400">freiwillig – nur dein eigener Status, jederzeit wieder trennbar</span>
+                    </div>
+                    @if ($teamsGekoppelt)
+                        <p class="mt-1 text-sm text-gray-700">
+                            Gekoppelt{{ $teamsKonto ? ' mit '.$teamsKonto : '' }}: <strong>Gehen</strong> stellt Teams auf „Offline“, <strong>Kommen</strong> wieder auf „Verfügbar“.
+                            Stellst du Teams selbst auf „Als offline anzeigen“ bzw. wieder auf verfügbar, fragt das PC-Programm, ob die Arbeitszeit enden bzw. beginnen soll.
+                        </p>
+                        @if ($teamsFehler)
+                            <p class="mt-1 text-xs text-red-600">Zuletzt: {{ $teamsFehler }}</p>
+                        @endif
+                        <form method="POST" action="{{ route('module.zeiterfassung.meine.teams.trennen') }}" class="mt-2"
+                              data-bestaetigen="Teams wird danach nicht mehr mit deiner Arbeitszeit abgeglichen." data-titel="Teams entkoppeln?" data-knopf="Entkoppeln">
+                            @csrf
+                            <button type="submit" class="text-sm text-red-600 hover:underline">Teams entkoppeln</button>
+                        </form>
+                    @else
+                        <p class="mt-1 text-sm text-gray-700">
+                            Auf Wunsch stellt Gehen dein Teams auf „Offline“ und Kommen wieder auf „Verfügbar“ – und das PC-Programm fragt nach,
+                            wenn du Teams selbst umstellst. Dazu einmal mit deinem Microsoft-Konto zustimmen (Berechtigung: eigenen Status lesen und setzen).
+                        </p>
+                        <a href="{{ route('module.zeiterfassung.meine.teams') }}" class="mt-2 inline-flex rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">Teams koppeln</a>
+                    @endif
+                </div>
+            @endif
+
             @if ($verstoesse->isNotEmpty())
                 <div class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
                     <div class="font-semibold">Hinweise zum Arbeitszeitgesetz (letzte 30 Tage)</div>

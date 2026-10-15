@@ -11,6 +11,8 @@ sonst Tagessoll, sonst Ende der Kernzeit) und die Höchstarbeitszeit – gebucht
   `lebenszeichen.txt` jede Minute, `abwesend-seit.txt` beim Sperren) und bucht nichts. Beim Zurückkommen:
   unter 15 Min. nichts (bleibt Arbeitszeit), ab 15 Min. „War das eine Pause?“ (Ja → Pause rückwirkend), ab 2 Std.
   „Arbeitsende um …?“. Solange gesperrt, keine Erinnerungen. „Beenden“ über das Menü fragt nach „Gehen“.
+- **Teams:** Ist Teams unter „Meine Zeiten“ gekoppelt, fragt das Programm bei einem Wechsel auf „Offline“ (während
+  eingestempelt) nach dem Arbeitsende und beim Wechsel zurück auf online nach dem Arbeitsbeginn.
 - **Protokoll:** `%APPDATA%\Zeiterfassung\protokoll.txt` (Fehlersuche).
 - **Automatisches Update:** Das Intranet meldet im Status die neueste Version (aus `resources/programm/version.json`).
   Ist sie neuer, lädt das Programm sie still nach, prüft die SHA-256-Prüfsumme, benennt die laufende Datei in

@@ -67,7 +67,7 @@ class Stempeluhr
      */
     public static function buchen(User $user, string $aktion, string $quelle, ?int $terminalId = null): Buchung
     {
-        return DB::transaction(function () use ($user, $aktion, $quelle, $terminalId) {
+        $buchung = DB::transaction(function () use ($user, $aktion, $quelle, $terminalId) {
             // Sperre gegen Doppelklick: zwei Anfragen gleichzeitig dürfen nicht zwei Abschnitte öffnen.
             User::whereKey($user->id)->lockForUpdate()->first();
 
@@ -110,5 +110,10 @@ class Stempeluhr
 
             return $offen;
         });
+
+        // Teams-Status mitziehen (nur bei Kopplung; Fehler bremsen die Buchung nicht).
+        TeamsStatus::nachBuchung($user, $aktion);
+
+        return $buchung;
     }
 }
