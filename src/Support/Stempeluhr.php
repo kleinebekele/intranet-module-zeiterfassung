@@ -66,7 +66,7 @@ class Stempeluhr
      * aktuellen Zustand keinen Sinn ergibt (doppelt gedrückt …).
      */
     /**
-     * @param  array{nachricht?: string}  $teams  Teams-Statusnachricht zur Pause
+     * @param  array{nachricht?: string, ohne?: bool}  $teams  Teams-Statusnachricht zur Pause; ohne = Teams nicht anfassen (Statusvorlage setzt selbst)
      */
     public static function buchen(User $user, string $aktion, string $quelle, ?int $terminalId = null, array $teams = []): Buchung
     {
@@ -115,7 +115,9 @@ class Stempeluhr
         });
 
         // Teams-Status mitziehen (nur bei Kopplung; Fehler bremsen die Buchung nicht).
-        TeamsStatus::nachBuchung($user, $aktion, $teams);
+        if (empty($teams['ohne'])) {
+            TeamsStatus::nachBuchung($user, $aktion, $teams);
+        }
 
         return $buchung;
     }

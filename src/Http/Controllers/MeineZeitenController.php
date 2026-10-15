@@ -5,6 +5,7 @@ namespace Intranet\Modules\Zeiterfassung\Http\Controllers;
 use Illuminate\Http\Request;
 use Intranet\Modules\Zeiterfassung\Models\Ausweis;
 use Intranet\Modules\Zeiterfassung\Models\Geraet;
+use Intranet\Modules\Zeiterfassung\Models\Statusvorlage;
 use Intranet\Modules\Zeiterfassung\Models\Verstoss;
 use Intranet\Modules\Zeiterfassung\Support\Einstellungen;
 use Intranet\Modules\Zeiterfassung\Support\Korrektur;
@@ -36,6 +37,7 @@ class MeineZeitenController
             'teamsGekoppelt' => TeamsStatus::gekoppelt($user),
             'teamsKonto' => TeamsStatus::konto($user),
             'teamsFehler' => TeamsStatus::letzterFehler($user),
+            'vorlagen' => Statusvorlage::where('user_id', $user->id)->orderBy('position')->orderBy('name')->get(),
         ]);
     }
 
@@ -93,6 +95,43 @@ class MeineZeitenController
 
         return redirect()->route('module.zeiterfassung.meine.index')
             ->with('status', 'Teams ist gekoppelt: Gehen stellt Teams auf offline, Kommen wieder auf verfügbar.');
+    }
+
+    /** Statusvorlage anlegen oder ändern (eigene). */
+    public function vorlageSpeichern(Request $request)
+    {
+        $user = $request->user();
+        abort_unless(Rechte::istTeilnehmer($user), 403);
+        $data = $request->validate([
+            'id' => ['nullable', 'integer'],
+            'name' => ['required', 'string', 'max:100'],
+            'minuten' => ['required', 'integer', 'min:15', 'max:300', 'multiple_of:15'],
+            'verfuegbarkeit' => ['required', 'in:'.implode(',', array_keys(Statusvorlage::STATUS))],
+            'text' => ['nullable', 'string', 'max:280'],
+            'rueckkehr' => ['required', 'in:'.implode(',', array_keys(Statusvorlage::RUECKKEHR))],
+        ]);
+
+        $vorlage = ! empty($data['id'])
+            ? Statusvorlage::where('user_id', $user->id)->findOrFail($data['id'])
+            : new Statusvorlage(['user_id' => $user->id, 'position' => (int) Statusvorlage::where('user_id', $user->id)->max('position') + 1]);
+        $vorlage->fill([
+            'name' => $data['name'],
+            'minuten' => $data['minuten'],
+            'verfuegbarkeit' => $data['verfuegbarkeit'],
+            'text' => $data['text'] ?? null,
+            'rueckkehr' => $data['rueckkehr'],
+            'pause' => $request->boolean('pause'),
+        ])->save();
+
+        return back()->with('status', 'Statusvorlage „'.$vorlage->name.'“ gespeichert – im PC-Programm per Rechtsklick → Statusvorlagen.');
+    }
+
+    public function vorlageEntfernen(Request $request, Statusvorlage $vorlage)
+    {
+        abort_unless($vorlage->user_id === $request->user()->id, 404);
+        $vorlage->delete();
+
+        return back()->with('status', 'Statusvorlage „'.$vorlage->name.'“ entfernt.');
     }
 
     public function teamsTrennen(Request $request)

@@ -33,6 +33,7 @@ type Status struct {
 	Nachtrag string        `json:"nachtrag"`
 	Programm *ProgrammInfo `json:"programm"`
 	Teams    *TeamsInfo    `json:"teams"` // nur bei Kopplung
+	Vorlagen []Vorlage     `json:"vorlagen"`
 }
 
 type TeamsInfo struct {
@@ -128,12 +129,16 @@ func (i *Intranet) Stempeln(aktion string, extra ...url.Values) (string, error) 
 	return a.Meldung, err
 }
 
-func (i *Intranet) PauseNachtragen(von, bis time.Time) (string, error) {
-	var a antwort
-	err := i.anfrage("POST", "pause-nachtragen", url.Values{
+func (i *Intranet) PauseNachtragen(von, bis time.Time, notiz ...string) (string, error) {
+	daten := url.Values{
 		"von": {von.Format(time.RFC3339)},
 		"bis": {bis.Format(time.RFC3339)},
-	}, &a)
+	}
+	if len(notiz) > 0 {
+		daten.Set("notiz", notiz[0])
+	}
+	var a antwort
+	err := i.anfrage("POST", "pause-nachtragen", daten, &a)
 	return a.Meldung, err
 }
 

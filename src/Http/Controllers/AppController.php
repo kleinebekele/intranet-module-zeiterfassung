@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Intranet\Modules\Zeiterfassung\Models\Buchung;
 use Intranet\Modules\Zeiterfassung\Models\Dienstplan;
 use Intranet\Modules\Zeiterfassung\Models\Schicht;
+use Intranet\Modules\Zeiterfassung\Models\Statusvorlage;
 use Intranet\Modules\Zeiterfassung\Models\Zeitmodell;
 use Intranet\Modules\Zeiterfassung\Support\Einstellungen;
 use Intranet\Modules\Zeiterfassung\Support\Korrektur;
@@ -61,6 +62,9 @@ class AppController
             'programm' => MeineZeitenController::programmInfo(), // neueste Version für das automatische Update
             // Teams-Status (nur bei Kopplung): Das Programm fragt bei einem Wechsel nach.
             'teams' => TeamsStatus::lesen($user),
+            'vorlagen' => TeamsStatus::gekoppelt($user)
+                ? Statusvorlage::where('user_id', $user->id)->orderBy('position')->orderBy('name')->get()->map->fuerApp()->values()
+                : [],
             'server_zeit' => $jetzt->toIso8601String(),
         ]);
     }
@@ -77,6 +81,7 @@ class AppController
         $data = $request->validate([
             'von' => ['required', 'date'],
             'bis' => ['required', 'date'],
+            'notiz' => ['nullable', 'string', 'max:200'],
         ]);
         $von = Carbon::parse($data['von'])->setTimezone(config('app.timezone'))->startOfMinute();
         $bis = Carbon::parse($data['bis'])->setTimezone(config('app.timezone'))->startOfMinute();
@@ -96,7 +101,7 @@ class AppController
         try {
             DB::transaction(function () use ($user, $offen, $von, $bis) {
                 $vorher = Korrektur::speichern($user, $user, $offen, $offen->beginn, $von,
-                    'Rechner war weg – Pause laut PC-Programm, bestätigt', true, 'app');
+                    $data['notiz'] ?? 'Rechner war weg – Pause laut PC-Programm, bestätigt', true, 'app');
                 $vorher->update(['ende_art' => 'pause']);
                 Buchung::create([
                     'user_id' => $user->id,
@@ -112,6 +117,55 @@ class AppController
         }
 
         return response()->json(['ok' => true, 'meldung' => 'Pause '.$von->format('H:i').'–'.$bis->format('H:i').' Uhr eingetragen.']);
+    }
+
+    /** Statusvorlage anwenden (Rechtsklick → Statusvorlagen im Programm). */
+    public function vorlage(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $vorlage = Statusvorlage::where('user_id', $user->id)->find((int) $request->input('id'));
+        if (! $vorlage) {
+            return response()->json(['ok' => false, 'meldung' => 'Diese Vorlage gibt es nicht mehr.'], 404);
+        }
+        if (! TeamsStatus::gekoppelt($user)) {
+            return response()->json(['ok' => false, 'meldung' => 'Teams ist nicht gekoppelt (Meine Zeiten → Teams koppeln).'], 409);
+        }
+
+        // Erst die Pause buchen (falls gewünscht) – klappt das nicht, bleibt auch Teams unverändert.
+        if ($vorlage->pause) {
+            try {
+                Stempeluhr::buchen($user, 'pause', 'app', null, ['ohne' => true]);
+            } catch (RuntimeException $e) {
+                return response()->json(['ok' => false, 'meldung' => $e->getMessage()], 409);
+            }
+        }
+
+        $bis = now()->addMinutes($vorlage->minuten);
+        try {
+            TeamsStatus::vorlageAnwenden($user, $vorlage);
+        } catch (RuntimeException $e) {
+            return response()->json(['ok' => false, 'meldung' => ($vorlage->pause ? 'Pause gebucht, aber ' : '').$e->getMessage()], 502);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'meldung' => '„'.$vorlage->name.'“: Teams '.$vorlage->statusText().' bis '.$bis->format('H:i').' Uhr'.($vorlage->pause ? ', Pause gebucht' : '').'.',
+            'bis' => $bis->toIso8601String(),
+            'rueckfrage' => $vorlage->rueckkehr !== 'automatisch',
+            'pause' => $vorlage->pause,
+        ]);
+    }
+
+    /** Teams zurück auf online (nach einer Statusvorlage mit Rückfrage). */
+    public function statusZuruecksetzen(Request $request): JsonResponse
+    {
+        try {
+            TeamsStatus::zuruecksetzen($request->user());
+        } catch (RuntimeException $e) {
+            return response()->json(['ok' => false, 'meldung' => $e->getMessage()], 502);
+        }
+
+        return response()->json(['ok' => true, 'meldung' => 'Teams ist wieder verfügbar.']);
     }
 
     /** Das Programm selbst – für das automatische Update. */

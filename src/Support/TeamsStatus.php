@@ -178,6 +178,47 @@ class TeamsStatus
         }
     }
 
+    /**
+     * Statusvorlage anwenden: Teams-Status und -Text für die Dauer der Vorlage. „automatisch":
+     * beides läuft nach der Dauer ab; „frage": bleibt, bis die Person im Programm zurücksetzt.
+     *
+     * @throws RuntimeException
+     */
+    public static function vorlageAnwenden(User $user, \Intranet\Modules\Zeiterfassung\Models\Statusvorlage $vorlage): void
+    {
+        $automatisch = $vorlage->rueckkehr === 'automatisch';
+        $bis = now()->addMinutes($vorlage->minuten);
+
+        $status = ['availability' => $vorlage->verfuegbarkeit, 'activity' => $vorlage->aktivitaet()];
+        if ($automatisch) {
+            $status['expirationDuration'] = 'PT'.$vorlage->minuten.'M';
+        }
+        self::graph($user, 'setUserPreferredPresence', $status);
+
+        $merker = 'zeit-teams-nachricht-'.$user->id;
+        if (trim((string) $vorlage->text) !== '') {
+            $nachricht = ['message' => ['content' => trim($vorlage->text), 'contentType' => 'text']];
+            if ($automatisch) {
+                $nachricht['expiryDateTime'] = ['dateTime' => $bis->copy()->utc()->format('Y-m-d\TH:i:s'), 'timeZone' => 'UTC'];
+            }
+            self::graph($user, 'setStatusMessage', ['statusMessage' => $nachricht]);
+            Cache::put($merker, true, $automatisch ? $bis : now()->addDay());
+        } elseif (Cache::pull($merker)) {
+            self::graph($user, 'setStatusMessage', ['statusMessage' => ['message' => ['content' => '', 'contentType' => 'text']]]);
+        }
+        Cache::forget(self::cacheStatus($user));
+    }
+
+    /** Zurück auf den automatischen Status; eigene Statusnachricht entfernen. @throws RuntimeException */
+    public static function zuruecksetzen(User $user): void
+    {
+        self::graph($user, 'clearUserPreferredPresence', (object) []);
+        if (Cache::pull('zeit-teams-nachricht-'.$user->id)) {
+            self::graph($user, 'setStatusMessage', ['statusMessage' => ['message' => ['content' => '', 'contentType' => 'text']]]);
+        }
+        Cache::forget(self::cacheStatus($user));
+    }
+
     /** POST auf /me/presence/{aktion}; wirft bei Fehler. */
     private static function graph(User $user, string $aktion, array|object $daten): void
     {

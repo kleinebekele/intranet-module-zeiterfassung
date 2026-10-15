@@ -77,6 +77,12 @@ type App struct {
 	abwesend     time.Time // Beginn der aktuellen Abwesenheit vom Rechner (unter merkerMu)
 	teamsVorher  string    // letzte gesehene Teams-Verfügbarkeit (unter mu)
 	pauseBis     time.Time // geplantes Pausenende aus dem Pausenfenster (unter merkerMu)
+	vorlageBis   time.Time // Statusvorlage mit Rückfrage läuft bis … (unter merkerMu)
+	vorlageName  string
+	vorlagen     []Vorlage // aktuelle Statusvorlagen (unter mu)
+
+	mVorlagen, mOnline *systray.MenuItem
+	vorlagePunkte      []*systray.MenuItem
 
 	mStatus, mKommen, mPause, mWeiter, mGehen, mOeffnen, mVerbindung, mAutostart, mBeenden *systray.MenuItem
 }
@@ -95,6 +101,7 @@ func (a *App) bereit() {
 	a.mPause = systray.AddMenuItem("Pause", "Pause beginnen")
 	a.mWeiter = systray.AddMenuItem("Pause beenden", "Weiter arbeiten")
 	a.mGehen = systray.AddMenuItem("Gehen", "Arbeitszeit beenden")
+	a.vorlagenMenueAnlegen()
 	systray.AddSeparator()
 	a.mOeffnen = systray.AddMenuItem("Meine Zeiten im Intranet öffnen", "")
 	a.mVerbindung = systray.AddMenuItem("Verbindung einrichten …", "Adresse und Schlüssel ändern")
@@ -361,7 +368,7 @@ func (a *App) erinnern() {
 		maxTag := s.Regeln.MaxTag
 		switch {
 		case maxTag > 0 && heuteMin >= maxTag && a.faellig("max"):
-			go a.erinnerung("max", "Du hast heute "+dauer(heuteMin)+" Std. gearbeitet – das ist die gesetzliche Höchstarbeitszeit.\n\nBitte jetzt Feierabend machen. Gehen buchen?", "Gehen", 15*time.Minute, "gehen")
+			go a.maxErreicht(heuteMin)
 		case maxTag > 0 && heuteMin >= maxTag-15 && a.einmal("max-bald"):
 			a.hinweis("In etwa 15 Minuten erreichst du die Höchstarbeitszeit von " + dauer(maxTag) + " Std.")
 		case s.Regeln.MaxBlock > 0 && block >= s.Regeln.MaxBlock-15 && a.faellig("pause"):
@@ -372,6 +379,7 @@ func (a *App) erinnern() {
 			}
 		}
 	}
+	a.vorlageErinnern()
 }
 
 // Feierabend: Schichtende laut Dienstplan, sonst Tagessoll erreicht, sonst Ende der Kernzeit.
@@ -535,6 +543,11 @@ func (a *App) stempeln(aktion string) {
 		if aktion == "kommen" {
 			a.erledige("start")
 		}
+		if aktion == "kommen" || aktion == "gehen" {
+			a.merkerMu.Lock()
+			a.vorlageBis = time.Time{} // Kommen/Gehen setzt Teams ohnehin neu
+			a.merkerMu.Unlock()
+		}
 	}
 	a.aktualisieren()
 }
@@ -598,6 +611,7 @@ func (a *App) aktualisieren() {
 
 func (a *App) menueSetzen() {
 	s := a.aktuell()
+	a.vorlagenMenueSetzen(s)
 	for _, m := range []*systray.MenuItem{a.mKommen, a.mPause, a.mWeiter, a.mGehen} {
 		m.Disable()
 	}

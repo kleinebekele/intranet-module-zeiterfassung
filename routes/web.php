@@ -30,6 +30,8 @@ Route::middleware(['web', 'auth'])
         Route::get('meine/teams', [MeineZeitenController::class, 'teamsStart'])->name('meine.teams');
         Route::get('meine/teams/zurueck', [MeineZeitenController::class, 'teamsZurueck'])->name('meine.teams.zurueck');
         Route::post('meine/teams/trennen', [MeineZeitenController::class, 'teamsTrennen'])->name('meine.teams.trennen');
+        Route::post('meine/vorlagen', [MeineZeitenController::class, 'vorlageSpeichern'])->name('meine.vorlage');
+        Route::post('meine/vorlagen/{vorlage}/entfernen', [MeineZeitenController::class, 'vorlageEntfernen'])->name('meine.vorlage.entfernen');
         Route::post('meine/geraete', [MeineZeitenController::class, 'geraetAnlegen'])->name('meine.geraet');
         Route::post('meine/geraete/{geraet}/entfernen', [MeineZeitenController::class, 'geraetEntfernen'])->name('meine.geraet.entfernen');
 
@@ -115,4 +117,6 @@ Route::middleware([GeraetZugang::class, 'throttle:120,1'])
         Route::post('stempeln', [AppController::class, 'stempeln'])->name('stempeln');
         Route::post('gehen-nachtragen', [AppController::class, 'gehenNachtragen'])->name('gehen');
         Route::post('pause-nachtragen', [AppController::class, 'pauseNachtragen'])->name('pause');
+        Route::post('vorlage', [AppController::class, 'vorlage'])->name('vorlage');
+        Route::post('status-zuruecksetzen', [AppController::class, 'statusZuruecksetzen'])->name('zuruecksetzen');
     });

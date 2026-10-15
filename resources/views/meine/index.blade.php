@@ -128,6 +128,37 @@
                             @csrf
                             <button type="submit" class="text-sm text-red-600 hover:underline">Teams entkoppeln</button>
                         </form>
+
+                        <div class="mt-4 border-t border-gray-100 pt-3">
+                            <div class="text-sm font-semibold text-gray-700">Statusvorlagen</div>
+                            <p class="text-xs text-gray-400">Im PC-Programm per Rechtsklick aufs Uhr-Symbol → „Statusvorlagen“.</p>
+                            <div class="mt-2 divide-y divide-gray-100">
+                                @foreach ($vorlagen as $v)
+                                    <details class="group py-2">
+                                        <summary class="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                                            <span class="font-medium text-gray-800">{{ $v->name }}</span>
+                                            <span class="text-gray-600">{{ $v->statusText() }} · {{ $v->minuten }} Min.{{ $v->pause ? ' · Pause' : '' }} · zurück {{ \Intranet\Modules\Zeiterfassung\Models\Statusvorlage::RUECKKEHR[$v->rueckkehr] ?? $v->rueckkehr }}</span>
+                                            @if ($v->text)<span class="truncate text-xs text-gray-400">„{{ $v->text }}“</span>@endif
+                                            <span class="ml-auto text-xs text-indigo-600 group-open:hidden">bearbeiten</span>
+                                        </summary>
+                                        <div class="mt-2 rounded-lg bg-gray-50 p-3">
+                                            @include('zeiterfassung::partials.statusvorlage-form', ['v' => $v])
+                                            <form method="POST" action="{{ route('module.zeiterfassung.meine.vorlage.entfernen', $v) }}" class="mt-2"
+                                                  data-bestaetigen="Die Vorlage verschwindet auch aus dem PC-Programm." data-titel="„{{ $v->name }}“ entfernen?" data-knopf="Entfernen">
+                                                @csrf
+                                                <button type="submit" class="text-xs text-red-600 hover:underline">Vorlage entfernen</button>
+                                            </form>
+                                        </div>
+                                    </details>
+                                @endforeach
+                            </div>
+                            <details class="mt-2" @if ($vorlagen->isEmpty()) open @endif>
+                                <summary class="cursor-pointer list-none text-sm text-indigo-600 hover:underline">+ Neue Statusvorlage</summary>
+                                <div class="mt-2 rounded-lg bg-gray-50 p-3">
+                                    @include('zeiterfassung::partials.statusvorlage-form', ['v' => null])
+                                </div>
+                            </details>
+                        </div>
                     @else
                         <p class="mt-1 text-sm text-gray-700">
                             Auf Wunsch stellt Gehen dein Teams auf „Offline“ und Kommen wieder auf „Verfügbar“ – und das PC-Programm fragt nach,
