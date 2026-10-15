@@ -5,6 +5,8 @@ namespace Intranet\Modules\Zeiterfassung\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Intranet\Modules\Zeiterfassung\Models\Buchung;
 use Intranet\Modules\Zeiterfassung\Models\Dienstplan;
 use Intranet\Modules\Zeiterfassung\Models\Schicht;
 use Intranet\Modules\Zeiterfassung\Models\Zeitmodell;
@@ -58,6 +60,55 @@ class AppController
             'programm' => MeineZeitenController::programmInfo(), // neueste Version für das automatische Update
             'server_zeit' => $jetzt->toIso8601String(),
         ]);
+    }
+
+    /**
+     * Pause nachtragen: Der Rechner war gesperrt, im Ruhezustand oder aus, und die Person
+     * bestätigt im Programm, dass das eine Pause war. Der laufende Abschnitt endet am
+     * Pausenbeginn, ein neuer beginnt am Pausenende. Die Zeiten stammen aus dem Protokoll des
+     * Programms und gelten nach Bestätigung sofort (wie beim Gehen laut Gerät).
+     */
+    public function pauseNachtragen(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $data = $request->validate([
+            'von' => ['required', 'date'],
+            'bis' => ['required', 'date'],
+        ]);
+        $von = Carbon::parse($data['von'])->setTimezone(config('app.timezone'))->startOfMinute();
+        $bis = Carbon::parse($data['bis'])->setTimezone(config('app.timezone'))->startOfMinute();
+
+        $offen = Stempeluhr::offen($user);
+        $fehler = match (true) {
+            ! $offen => 'Du bist nicht eingestempelt.',
+            $von->lte($offen->beginn) => 'Die Pause beginnt vor deinem Arbeitsbeginn.',
+            $bis->lte($von) => 'Das Pausenende muss nach dem Beginn liegen.',
+            $bis->gt(now()->addMinute()) => 'Zeiten in der Zukunft lassen sich nicht erfassen.',
+            default => null,
+        };
+        if ($fehler) {
+            return response()->json(['ok' => false, 'meldung' => $fehler], 409);
+        }
+
+        try {
+            DB::transaction(function () use ($user, $offen, $von, $bis) {
+                $vorher = Korrektur::speichern($user, $user, $offen, $offen->beginn, $von,
+                    'Rechner war weg – Pause laut PC-Programm, bestätigt', true, 'app');
+                $vorher->update(['ende_art' => 'pause']);
+                Buchung::create([
+                    'user_id' => $user->id,
+                    'beginn' => $bis,
+                    'quelle' => 'app',
+                    'status' => Buchung::GUELTIG,
+                    'erfasst_von' => $user->id,
+                    'notiz' => 'Weiter nach Pause laut PC-Programm',
+                ]);
+            });
+        } catch (RuntimeException $e) {
+            return response()->json(['ok' => false, 'meldung' => $e->getMessage()], 409);
+        }
+
+        return response()->json(['ok' => true, 'meldung' => 'Pause '.$von->format('H:i').'–'.$bis->format('H:i').' Uhr eingetragen.']);
     }
 
     /** Das Programm selbst – für das automatische Update. */

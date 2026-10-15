@@ -45,9 +45,10 @@ Persönliche Codes werden immer zufällig erzeugt (mindestens 6 Ziffern; ältere
 
 Unter „Meine Zeiten“ verbindet man ein Gerät (PC/Mac) und bekommt einmalig Adresse + Schlüssel für das Programm.
 Das Programm misst nichts: Es fragt beim Start „Arbeitszeit starten?“, erinnert anhand von Kernzeit, Dienstplan und
-Arbeitszeitgesetz an Pause und Feierabend und bucht nur, was man anklickt. Es schreibt jede Minute ein Lebenszeichen in
-ein eigenes, lokales Protokoll; war der Rechner aus, während man eingestempelt war, schlägt es beim nächsten Start das
-letzte Lebenszeichen als Ende vor. Bestätigt gilt das sofort; eine andere Zeit nur mit Nachtragsrecht „sofort gültig“.
+Arbeitszeitgesetz an Pause und Feierabend und bucht nur, was man anklickt. War man weg vom Rechner (gesperrt,
+Ruhezustand, aus), fragt es beim Zurückkommen: ab 15 Min. „War das eine Pause?“, ab 2 Std. „Arbeitsende um …?“ –
+die Zeiten stammen aus dem lokalen Protokoll des Programms. Bestätigt gilt das sofort; eine andere Endzeit nur mit
+Nachtragsrecht „sofort gültig“.
 
 Voraussetzung: Rolle `zeit-homeoffice` (Stempeln im Intranet) bzw. Verwaltung. Schnittstelle (`Authorization: Bearer …`):
 
@@ -56,6 +57,7 @@ Voraussetzung: Rolle `zeit-homeoffice` (Stempeln im Intranet) bzw. Verwaltung. S
 | `GET zeit-app/v1/status` | Zustand, heutige Arbeitszeit, Soll, Kernzeit, Schicht laut Dienstplan, Regeln |
 | `POST zeit-app/v1/stempeln` | `aktion` = kommen, pause, weiter, gehen |
 | `POST zeit-app/v1/gehen-nachtragen` | `zeit` (ISO 8601), `laut_geraet` (0/1), optional `notiz` |
+| `POST zeit-app/v1/pause-nachtragen` | `von`, `bis` (ISO 8601) – Abschnitt endet am Pausenbeginn, neuer beginnt am Ende |
 | `GET zeit-app/v1/programm` | die aktuelle `Zeiterfassung.exe` (automatisches Update; Version + SHA-256 stehen im Status) |
 
 ## Dienstplan-Vorschlag

@@ -7,9 +7,10 @@ sonst Tagessoll, sonst Ende der Kernzeit) und die Höchstarbeitszeit – gebucht
 - **Einrichten:** Im Intranet unter „Meine Zeiten → PC-Programm“ herunterladen, „Gerät verbinden“, den
   Verbindungscode beim ersten Start einfügen. Das Programm kopiert sich nach `%LOCALAPPDATA%\Programs\Zeiterfassung`
   und trägt sich in den Autostart des Benutzers ein (abschaltbar im Menü). Keine Adminrechte nötig.
-- **Lebenszeichen:** jede Minute in `%APPDATA%\Zeiterfassung\lebenszeichen.txt`. War der Rechner aus oder länger
-  als 2 Std. im Ruhezustand, während man eingestempelt war, schlägt es das letzte Lebenszeichen als Ende vor.
-  „Beenden“ über das Menü fragt nach „Gehen“ und hinterlässt keinen Vorschlag.
+- **Weg vom Rechner** (gesperrt, Ruhezustand, abgemeldet, aus): Das Programm merkt sich nur den Beginn (lokal,
+  `lebenszeichen.txt` jede Minute, `abwesend-seit.txt` beim Sperren) und bucht nichts. Beim Zurückkommen:
+  unter 15 Min. nichts (bleibt Arbeitszeit), ab 15 Min. „War das eine Pause?“ (Ja → Pause rückwirkend), ab 2 Std.
+  „Arbeitsende um …?“. Solange gesperrt, keine Erinnerungen. „Beenden“ über das Menü fragt nach „Gehen“.
 - **Protokoll:** `%APPDATA%\Zeiterfassung\protokoll.txt` (Fehlersuche).
 - **Automatisches Update:** Das Intranet meldet im Status die neueste Version (aus `resources/programm/version.json`).
   Ist sie neuer, lädt das Programm sie still nach, prüft die SHA-256-Prüfsumme, benennt die laufende Datei in

@@ -111,4 +111,5 @@ Route::middleware([GeraetZugang::class, 'throttle:120,1'])
         Route::get('programm', [AppController::class, 'programm'])->name('programm');
         Route::post('stempeln', [AppController::class, 'stempeln'])->name('stempeln');
         Route::post('gehen-nachtragen', [AppController::class, 'gehenNachtragen'])->name('gehen');
+        Route::post('pause-nachtragen', [AppController::class, 'pauseNachtragen'])->name('pause');
     });

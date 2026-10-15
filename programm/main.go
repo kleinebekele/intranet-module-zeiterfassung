@@ -74,6 +74,7 @@ type App struct {
 
 	updateLaeuft atomic.Bool
 	nachUpdate   bool
+	abwesend     time.Time // Beginn der aktuellen Abwesenheit vom Rechner (unter merkerMu)
 
 	mStatus, mKommen, mPause, mWeiter, mGehen, mOeffnen, mVerbindung, mAutostart, mBeenden *systray.MenuItem
 }
@@ -166,6 +167,11 @@ func (a *App) start() {
 	}
 
 	beat, beatOk := letztesLebenszeichen()
+	// War der Rechner vor dem Ausschalten schon gesperrt, beginnt die Abwesenheit dort.
+	if seit, ok := gespeicherteAbwesenheit(); ok && (!beatOk || seit.Before(beat)) {
+		beat, beatOk = seit, true
+	}
+	a.vergissAbwesend()
 	jetzt := time.Now()
 	schreibeLebenszeichen(jetzt)
 	a.letzterTick = jetzt
@@ -178,6 +184,8 @@ func (a *App) start() {
 	} else {
 		a.startfragen(beat, beatOk)
 	}
+
+	go a.sperreBeobachten()
 
 	takt := time.NewTicker(time.Minute)
 	for t := range takt.C {
@@ -263,8 +271,9 @@ func (a *App) startfragen(beat time.Time, beatOk bool) {
 	beginn, _ := time.Parse(time.RFC3339, s.OffenBeginn)
 
 	switch {
-	case s.Zustand == "da" && beatOk && time.Since(beat) > 10*time.Minute && beat.After(beginn):
-		a.endeVorschlagen(beat, "Der Rechner war aus")
+	case s.Zustand == "da" && beatOk && time.Since(beat) >= abwesendAbPause && beat.After(beginn):
+		// Ab 15 Min. Pause anbieten, ab 2 Std. Arbeitsende vorschlagen.
+		a.abwesenheitKlaeren(beat, time.Now(), "Der Rechner war aus")
 	case s.Zustand == "da" && s.OffenSeitVortag:
 		if a.frage(fmt.Sprintf("Du bist seit %s eingestempelt – vermutlich vergessen auszustempeln.\n\nIm Intranet unter „Meine Zeiten“ korrigieren?", beginn.Local().Format("02.01. 15:04")), "Intranet öffnen", "Später", "") == antwortJa {
 			if i := a.verbindung(); i != nil {
@@ -291,13 +300,21 @@ func (a *App) takt(t time.Time) {
 	a.letzterTick = t
 	schreibeLebenszeichen(t)
 
-	// Lange Lücke (Ruhezustand über Nacht o. Ä.) während eingestempelt: Ende vorschlagen.
-	if s := a.aktuell(); s != nil && s.Zustand == "da" && t.Sub(vorher) > 2*time.Hour {
-		a.aktualisieren()
-		if s := a.aktuell(); s != nil && s.Zustand == "da" {
-			go a.endeVorschlagen(vorher, "Der Rechner war im Ruhezustand")
-			return
+	// Lücke im Takt = Ruhezustand. Noch gesperrt? Dann klärt das Entsperren; sonst gleich nachfragen.
+	if t.Sub(vorher) >= abwesendAbPause {
+		if gesperrt() {
+			a.merkeAbwesend(vorher)
+		} else if seit, ok := a.abwesendSeit(); ok {
+			a.vergissAbwesend()
+			go a.abwesenheitKlaeren(seit, t, "Der Rechner war gesperrt bzw. im Ruhezustand")
+		} else {
+			go a.abwesenheitKlaeren(vorher, t, "Der Rechner war im Ruhezustand")
 		}
+		return
+	}
+	// Während der Rechner gesperrt ist, keine Erinnerungen – es sitzt ja niemand davor.
+	if _, ok := a.abwesendSeit(); ok {
+		return
 	}
 
 	if t.Sub(a.geholtAm) >= 5*time.Minute || a.aktuell() == nil {

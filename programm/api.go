@@ -116,6 +116,15 @@ func (i *Intranet) Stempeln(aktion string) (string, error) {
 	return a.Meldung, err
 }
 
+func (i *Intranet) PauseNachtragen(von, bis time.Time) (string, error) {
+	var a antwort
+	err := i.anfrage("POST", "pause-nachtragen", url.Values{
+		"von": {von.Format(time.RFC3339)},
+		"bis": {bis.Format(time.RFC3339)},
+	}, &a)
+	return a.Meldung, err
+}
+
 func (i *Intranet) GehenNachtragen(zeit time.Time, lautGeraet bool) (string, error) {
 	laut := "0"
 	if lautGeraet {
