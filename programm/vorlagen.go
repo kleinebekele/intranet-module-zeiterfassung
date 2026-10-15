@@ -154,10 +154,10 @@ func (a *App) vorlageErinnern() {
 		return
 	}
 	go func() {
-		if a.frage("Die Statusvorlage „"+name+"“ ist abgelaufen.\n\nTeams wieder auf „Verfügbar“ stellen?", "Ja, verfügbar", "Später", "") == antwortJa {
+		if a.frage("Die Statusvorlage „"+name+"“ ist abgelaufen.\n\nTeams wieder auf „Verfügbar“ stellen?", "Ja, verfügbar", "Erneut erinnern …", "") == antwortJa {
 			a.teamsZurueck()
 			return
 		}
-		a.ruhe("vorlage", 10*time.Minute)
+		a.erneutErinnern("vorlage")
 	}()
 }

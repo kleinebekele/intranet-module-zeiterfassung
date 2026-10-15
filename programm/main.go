@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -361,7 +362,7 @@ func (a *App) erinnern() {
 		}
 		a.merkerMu.Unlock()
 		if err == nil && !jetzt.Before(ende) && a.faellig("weiter") {
-			go a.erinnerung("weiter", "Deine Pause läuft seit "+dauer(int(jetzt.Sub(seit).Minutes()))+" Std.\n\nPause beenden und weiter arbeiten?", "Pause beenden", 10*time.Minute, "weiter")
+			go a.erinnerung("weiter", "Deine Pause läuft seit "+dauer(int(jetzt.Sub(seit).Minutes()))+" Std.\n\nPause beenden und weiter arbeiten?", "Pause beenden", 0, "weiter")
 		}
 
 	case "da":
@@ -453,11 +454,16 @@ func (a *App) frageStart() {
 }
 
 // Erinnerung mit „Später": Ja bucht die Aktion, Später ruht für die angegebene Zeit.
+// ruhe == 0: „Erneut erinnern …" mit Auswahl der Minuten statt festem „Später".
 func (a *App) erinnerung(schluessel, text, ja string, ruhe time.Duration, aktion string) {
 	if a.dialog.Load() {
 		return
 	}
-	if a.frage(text, ja, "Später", "") == antwortJa {
+	nein := "Später"
+	if ruhe == 0 {
+		nein = "Erneut erinnern …"
+	}
+	if a.frage(text, ja, nein, "") == antwortJa {
 		if aktion == "pause" {
 			a.pauseStarten()
 		} else {
@@ -465,7 +471,28 @@ func (a *App) erinnerung(schluessel, text, ja string, ruhe time.Duration, aktion
 		}
 		return
 	}
+	if ruhe == 0 {
+		a.erneutErinnern(schluessel)
+		return
+	}
 	a.ruhe(schluessel, ruhe)
+}
+
+// „In X Minuten erneut erinnern" – Auswahl 5 bis 60 Min., ohne Auswahl 10 Min.
+func (a *App) erneutErinnern(schluessel string) {
+	a.dialog.Store(true)
+	wahl, err := zenity.List("In wie vielen Minuten erneut erinnern?",
+		[]string{"5 Minuten", "10 Minuten", "15 Minuten", "20 Minuten", "30 Minuten", "45 Minuten", "60 Minuten"},
+		zenity.Title(titel), zenity.DefaultItems("10 Minuten"), zenity.OKLabel("Erinnern"), zenity.CancelLabel("Abbrechen"))
+	a.dialog.Store(false)
+	minuten := 10
+	if err == nil {
+		if n, e := strconv.Atoi(strings.Fields(wahl + " 10")[0]); e == nil && n > 0 {
+			minuten = n
+		}
+	}
+	a.ruhe(schluessel, time.Duration(minuten)*time.Minute)
+	protokoll(fmt.Sprintf("Erinnerung %s in %d Min.", schluessel, minuten))
 }
 
 // Rechner war aus/im Ruhezustand während eingestempelt: Ende vorschlagen.

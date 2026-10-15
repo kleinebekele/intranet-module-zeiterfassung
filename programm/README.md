@@ -16,6 +16,7 @@ sonst Tagessoll, sonst Ende der Kernzeit) und die Höchstarbeitszeit – gebucht
 - **Statusvorlagen:** Rechtsklick → „Statusvorlagen“ zeigt die eigenen Vorlagen aus dem Intranet (Meine Zeiten → Teams):
   Teams-Status + Text für 5 Min. oder 15–300 Min., danach automatisch zurück oder nach Rückfrage; optional zugleich Pause buchen.
   „Teams wieder auf Verfügbar“ beendet eine Vorlage vorzeitig.
+  Bei abgelaufener Vorlage bzw. Pause: „Erneut erinnern …“ in 5/10/15/20/30/45/60 Min.
 - **Höchstarbeitszeit (10 Std.):** Fenster „Feierabend (Gehen buchen)“ oder „Pause vergessen“ – dann Dauer (15–300 Min.)
   und Beginn wählen, die Pause wird nachgetragen und es geht weiter.
 - **Teams:** Ist Teams unter „Meine Zeiten“ gekoppelt, fragt das Programm bei einem Wechsel auf „Offline“ (während
