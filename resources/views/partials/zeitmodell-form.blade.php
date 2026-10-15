@@ -60,12 +60,15 @@
                         </tr>
                     @endforeach
                     <tr class="text-xs">
-                        <td class="pr-2 pt-1 text-gray-600">Std.</td>
+                        <td class="pr-2 pt-1 text-gray-600" title="Arbeitszeit = Kernzeit abzüglich gesetzlicher Pause">Arbeit</td>
                         @foreach (array_keys(\Intranet\Modules\Zeiterfassung\Models\Zeitmodell::TAGE) as $nr)
-                            <td class="pt-1 text-center tabular-nums text-gray-700" x-text="tagText({{ $nr }})"></td>
+                            <td class="pt-1 text-center tabular-nums text-gray-700" :title="tagTitel({{ $nr }})">
+                                <span x-text="tagText({{ $nr }})"></span>
+                                <span x-show="pause(anwesend({{ $nr }})) > 0" class="block text-[11px] text-gray-400" x-text="'−' + pause(anwesend({{ $nr }})) + ' Min. Pause'"></span>
+                            </td>
                         @endforeach
                         <td class="pt-1 text-center tabular-nums">
-                            <span class="font-semibold text-gray-800" x-text="dauer(summe())"></span>
+                            <span class="font-semibold text-gray-800" x-text="dauer(summe())" title="Arbeitszeit der Kernzeiten (ohne Pausen)"></span>
                             <span x-show="sollMinuten() > 0" :class="prozent() > 100 ? 'text-amber-700' : 'text-gray-500'"
                                   x-text="'= ' + prozent() + ' % von ' + dauer(sollMinuten())"></span>
                         </td>
@@ -74,6 +77,7 @@
             </table>
         </div>
         <p class="mt-1 text-xs text-gray-400">
+            Unter jedem Tag die Arbeitszeit: Kernzeit abzüglich gesetzlicher Pause (über 6 Std. 30 Min., über 9:30 Std. 45 Min.).
             Die Tage mit Kernarbeitszeit sind die Arbeitstage – auf sie werden die Wochenstunden verteilt (ohne Kernzeit: Mo–Fr).
             Für den Dienstplan ist die Kernzeit eine Orientierung, keine Pflicht: Der Vorschlag plant bevorzugt an diesen Tagen und zu diesen Zeiten.
         </p>
@@ -91,11 +95,18 @@
             Alpine.data('kernRechner', (wochen, kern) => ({
                 wochen, kern,
                 minuten(t) { const m = /^(\d{1,2}):(\d{2})/.exec(t || ''); return m ? (+m[1]) * 60 + (+m[2]) : null; },
-                tag(nr) {
+                anwesend(nr) {
                     const von = this.minuten(this.kern[nr].von), bis = this.minuten(this.kern[nr].bis);
                     return von !== null && bis !== null && bis > von ? bis - von : 0;
                 },
+                // Gesetzliche Pause (§ 4 ArbZG) wie im Dienstplan: bis 6 Std. keine, bis 9:30 Std. 30 Min., darüber 45 Min.
+                pause(m) { return m <= 360 ? 0 : (m <= 570 ? 30 : 45); },
+                tag(nr) { const m = this.anwesend(nr); return m - this.pause(m); },
                 tagText(nr) { const m = this.tag(nr); return m ? this.dauer(m) : '–'; },
+                tagTitel(nr) {
+                    const m = this.anwesend(nr);
+                    return m ? this.dauer(m) + ' Std. Kernzeit − ' + this.pause(m) + ' Min. Pause = ' + this.dauer(this.tag(nr)) + ' Std. Arbeit' : '';
+                },
                 summe() { return [1, 2, 3, 4, 5, 6, 7].reduce((s, nr) => s + this.tag(nr), 0); },
                 sollMinuten() {
                     const t = String(this.wochen || '').trim(), m = /^(\d{1,3}):([0-5]\d)$/.exec(t);
