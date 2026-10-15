@@ -117,7 +117,7 @@
                     </div>
                     @if ($teamsGekoppelt)
                         <p class="mt-1 text-sm text-gray-700">
-                            Gekoppelt{{ $teamsKonto ? ' mit '.$teamsKonto : '' }}: <strong>Gehen</strong> stellt Teams auf „Offline“, <strong>Kommen</strong> wieder auf „Verfügbar“.
+                            Gekoppelt{{ $teamsKonto ? ' mit '.$teamsKonto : '' }}: <strong>Gehen</strong> stellt Teams auf „Offline“, <strong>Pause</strong> auf „Bin gleich zurück“, <strong>Kommen</strong> bzw. Pause beenden wieder auf „Verfügbar“.
                             Stellst du Teams selbst auf „Als offline anzeigen“ bzw. wieder auf verfügbar, fragt das PC-Programm, ob die Arbeitszeit enden bzw. beginnen soll.
                         </p>
                         @if ($teamsFehler)

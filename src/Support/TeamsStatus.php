@@ -17,8 +17,8 @@ use Throwable;
  *
  * Die Person verbindet unter „Meine Zeiten" ihr eigenes Microsoft-Konto mit der delegierten
  * Berechtigung Presence.ReadWrite – das Intranet darf damit nur ihren eigenen Status lesen
- * und setzen. Gehen → Teams „Offline" (wie „Als offline anzeigen"), Kommen → zurück auf den
- * automatischen Status. Das PC-Programm sieht den Status über zeit-app/v1/status und fragt bei
+ * und setzen. Gehen → Teams „Offline" (wie „Als offline anzeigen"), Pause → „Bin gleich zurück",
+ * Kommen und Pause beenden → zurück auf den automatischen Status. Das PC-Programm sieht den Status über zeit-app/v1/status und fragt bei
  * einem Wechsel nach (gebucht wird nur nach Bestätigung).
  *
  * Nutzt dieselbe Entra-App wie die Microsoft-Anmeldung (MS_TENANT_ID/MS_CLIENT_ID/MS_CLIENT_SECRET).
@@ -139,15 +139,27 @@ class TeamsStatus
         });
     }
 
-    /** Nach einer Buchung: Gehen → Offline, Kommen → automatischer Status. Fehler werden nur gemerkt. */
+    /** Teams-Status je Buchung: null = zurück auf den automatischen Status. */
+    private const NACH_AKTION = [
+        'gehen' => ['availability' => 'Offline', 'activity' => 'OffWork'],
+        'pause' => ['availability' => 'BeRightBack', 'activity' => 'BeRightBack'],
+        'kommen' => null,
+        'weiter' => null,
+    ];
+
+    /**
+     * Nach einer Buchung: Gehen → Offline, Pause → „Bin gleich zurück", Kommen und Pause
+     * beenden → automatischer Status. Fehler werden nur gemerkt.
+     */
     public static function nachBuchung(User $user, string $aktion): void
     {
-        if (! in_array($aktion, ['kommen', 'gehen'], true) || ! self::gekoppelt($user)) {
+        if (! array_key_exists($aktion, self::NACH_AKTION) || ! self::gekoppelt($user)) {
             return;
         }
         try {
-            $pfad = $aktion === 'gehen' ? 'setUserPreferredPresence' : 'clearUserPreferredPresence';
-            $daten = $aktion === 'gehen' ? ['availability' => 'Offline', 'activity' => 'OffWork'] : (object) [];
+            $status = self::NACH_AKTION[$aktion];
+            $pfad = $status ? 'setUserPreferredPresence' : 'clearUserPreferredPresence';
+            $daten = $status ?? (object) [];
             $antwort = Http::withToken(self::zugriffsToken($user))->timeout(8)
                 ->post('https://graph.microsoft.com/v1.0/me/presence/'.$pfad, $daten);
             if ($antwort->failed()) {
