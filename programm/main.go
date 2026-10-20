@@ -132,7 +132,9 @@ func (a *App) klicks() {
 			}
 		case <-a.mVerbindung.ClickedCh:
 			go func() {
-				if a.einrichten(false) {
+				if a.verbindung() != nil {
+					a.verbindungLoesen()
+				} else if a.einrichten(false) {
 					a.aktualisieren()
 				}
 			}()
@@ -253,6 +255,27 @@ func (a *App) einrichten(erstesMal bool) bool {
 		_ = zenity.Info("Verbunden!\n\nDie Zeiterfassung startet ab jetzt mit Windows.\nDas Uhr-Symbol findest du unten rechts neben der Uhrzeit (ggf. unter dem kleinen Pfeil ^).", zenity.Title(titel))
 		return true
 	}
+}
+
+// Verbindung lösen: Schlüssel auf diesem Rechner vergessen. Danach heißt der Menüpunkt
+// wieder „Verbindung einrichten …". Das Gerät im Intranet bleibt eingetragen, bis man es
+// unter „Meine Zeiten“ trennt.
+func (a *App) verbindungLoesen() {
+	if a.frage("Dieses Gerät vom Intranet trennen?\n\nDas Programm kann danach nicht mehr stempeln, bis du es mit einem neuen Verbindungscode wieder verbindest.", "Trennen", "Abbrechen", "") != antwortJa {
+		return
+	}
+	if err := loescheEinstellungen(); err != nil {
+		a.fehler("Verbindung ließ sich nicht lösen: " + err.Error())
+		return
+	}
+	a.mu.Lock()
+	a.intranet, a.status = nil, nil
+	a.mu.Unlock()
+	protokoll("Verbindung gelöst")
+	a.menueSetzen()
+	a.mStatus.SetTitle("Nicht verbunden")
+	systray.SetIcon(symbol(farbeFehler))
+	systray.SetTooltip(titel + " – nicht verbunden")
 }
 
 // „https://intranet.firma.de#zg_…" → Adresse und Schlüssel; einzelne Teile gehen auch.
@@ -637,6 +660,13 @@ func (a *App) aktualisieren() {
 }
 
 func (a *App) menueSetzen() {
+	if a.verbindung() != nil {
+		a.mVerbindung.SetTitle("Verbindung lösen …")
+		a.mVerbindung.SetTooltip("Dieses Gerät vom Intranet trennen")
+	} else {
+		a.mVerbindung.SetTitle("Verbindung einrichten …")
+		a.mVerbindung.SetTooltip("Verbindungscode aus dem Intranet einfügen")
+	}
 	s := a.aktuell()
 	a.vorlagenMenueSetzen(s)
 	for _, m := range []*systray.MenuItem{a.mKommen, a.mPause, a.mWeiter, a.mGehen} {

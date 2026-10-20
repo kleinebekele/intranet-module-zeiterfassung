@@ -40,6 +40,13 @@ func speichereEinstellungen(e Einstellungen) error {
 	return os.WriteFile(filepath.Join(datenOrdner(), "einstellungen.json"), inhalt, 0o600)
 }
 
+func loescheEinstellungen() error {
+	if err := os.Remove(filepath.Join(datenOrdner(), "einstellungen.json")); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
 // Lebenszeichen: jede Minute die aktuelle Uhrzeit. Fehlt es eine Weile, war der Rechner
 // aus oder im Ruhezustand. „beendet" heißt: das Programm wurde ordentlich geschlossen –
 // dann wird beim nächsten Start nichts vorgeschlagen.
