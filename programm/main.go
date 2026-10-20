@@ -35,7 +35,8 @@ func main() {
 			time.Sleep(500 * time.Millisecond)
 		}
 		go aufraeumenNachUpdate()
-		a := &App{spaeter: map[string]time.Time{}, erledigt: map[string]string{}, nachUpdate: true}
+		merkeVersion()
+		a :=&App{spaeter: map[string]time.Time{}, erledigt: map[string]string{}, nachUpdate: true}
 		systray.Run(a.bereit, func() {})
 		return
 	}

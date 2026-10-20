@@ -45,7 +45,17 @@ func installiereBeiBedarf() (neuGestartet bool, err error) {
 	}
 	ziel := installationsPfad()
 	if strings.EqualFold(filepath.Clean(exe), filepath.Clean(ziel)) {
+		merkeVersion()
 		return false, nil
+	}
+	// Ein alter Download darf eine neuere Installation nicht überschreiben (sie aktualisiert
+	// sich selbst). Dann einfach die installierte Fassung starten.
+	if _, err := os.Stat(ziel); err == nil && !neuer(Version, installierteVersion()) {
+		protokoll("Gestartet aus " + exe + " (" + Version + "), installiert ist " + installierteVersion() + " – starte die installierte")
+		if err := exec.Command(ziel).Start(); err != nil {
+			return false, err
+		}
+		return true, nil
 	}
 	if err := os.MkdirAll(filepath.Dir(ziel), 0o755); err != nil {
 		return false, err
@@ -53,10 +63,25 @@ func installiereBeiBedarf() (neuGestartet bool, err error) {
 	if err := kopiere(exe, ziel); err != nil {
 		return false, err
 	}
+	merkeVersion()
 	if err := exec.Command(ziel).Start(); err != nil {
 		return false, err
 	}
 	return true, nil
+}
+
+// Version der installierten Fassung, als Datei daneben. Fehlt sie (vor 1.5.4 installiert),
+// gilt „0" – dann darf jede neuere Datei drüber.
+func versionsDatei() string { return filepath.Join(filepath.Dir(installationsPfad()), "version.txt") }
+
+func merkeVersion() { _ = os.WriteFile(versionsDatei(), []byte(Version), 0o644) }
+
+func installierteVersion() string {
+	inhalt, err := os.ReadFile(versionsDatei())
+	if err != nil {
+		return "0"
+	}
+	return strings.TrimSpace(string(inhalt))
 }
 
 func kopiere(von, nach string) error {
