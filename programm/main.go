@@ -703,7 +703,7 @@ func (a *App) menueSetzen() {
 	text := map[string]string{"da": "Da" + seit, "pause": "Pause" + seit, "weg": "Nicht eingestempelt"}[s.Zustand]
 	text += " · heute " + dauer(s.HeuteMinuten) + " Std."
 	a.mStatus.SetTitle(text)
-	systray.SetTooltip(titel + " – " + text)
+	systray.SetTooltip(a.tooltipText(s, "Heute "+dauer(s.HeuteMinuten)+" Std."))
 	switch s.Zustand {
 	case "da":
 		systray.SetIcon(symbol(farbeDa))

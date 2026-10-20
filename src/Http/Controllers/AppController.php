@@ -47,6 +47,9 @@ class AppController
             'seit' => $status['seit']?->toIso8601String(),
             'aktionen' => $status['aktionen'],
             'heute_minuten' => $status['heute'],
+            // Heutige Abschnitte für den Mouseover im Programm (bis = null: läuft noch).
+            'abschnitte' => Buchung::gueltig()->where('user_id', $user->id)->zwischen($jetzt, $jetzt)->orderBy('beginn')->get()
+                ->map(fn (Buchung $b) => ['von' => $b->beginn->format('H:i'), 'bis' => $b->ende?->format('H:i')])->values(),
             'block_minuten' => $status['block'],
             // Offen seit einem früheren Tag: vergessen auszustempeln oder Gerät aus.
             'offen_seit_vortag' => $offen !== null && $offen->beginn->lt($jetzt->copy()->startOfDay()),

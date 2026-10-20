@@ -13,19 +13,20 @@ import (
 
 // Status, wie ihn das Intranet unter zeit-app/v1/status liefert.
 type Status struct {
-	OK              bool      `json:"ok"`
-	Meldung         string    `json:"meldung"`
-	Person          string    `json:"person"`
-	Zustand         string    `json:"zustand"` // da | pause | weg
-	Seit            string    `json:"seit"`
-	Aktionen        []string  `json:"aktionen"`
-	HeuteMinuten    int       `json:"heute_minuten"`
-	BlockMinuten    int       `json:"block_minuten"`
-	OffenSeitVortag bool      `json:"offen_seit_vortag"`
-	OffenBeginn     string    `json:"offen_beginn"`
-	SollHeute       int       `json:"soll_heute_minuten"`
-	Kern            *Zeitraum `json:"kern"`
-	Schicht         *Zeitraum `json:"schicht"`
+	OK              bool       `json:"ok"`
+	Meldung         string     `json:"meldung"`
+	Person          string     `json:"person"`
+	Zustand         string     `json:"zustand"` // da | pause | weg
+	Seit            string     `json:"seit"`
+	Aktionen        []string   `json:"aktionen"`
+	HeuteMinuten    int        `json:"heute_minuten"`
+	Abschnitte      []Zeitraum `json:"abschnitte"` // heute; Bis leer = läuft noch
+	BlockMinuten    int        `json:"block_minuten"`
+	OffenSeitVortag bool       `json:"offen_seit_vortag"`
+	OffenBeginn     string     `json:"offen_beginn"`
+	SollHeute       int        `json:"soll_heute_minuten"`
+	Kern            *Zeitraum  `json:"kern"`
+	Schicht         *Zeitraum  `json:"schicht"`
 	Regeln          struct {
 		MaxBlock int `json:"max_block"`
 		MaxTag   int `json:"max_tag"`
