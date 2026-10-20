@@ -13,6 +13,8 @@ sonst Tagessoll, sonst Ende der Kernzeit) und die Höchstarbeitszeit – gebucht
   „Arbeitsende um …?“. Solange gesperrt, keine Erinnerungen. „Beenden“ über das Menü fragt nach „Gehen“.
 - **Pause:** Fenster mit 15/30/45/60 Min. und – bei gekoppeltem Teams – Statusnachricht. Nach der gewählten Dauer
   fragt das Programm nur „Pause beenden?“; ohne Antwort bleibt es Pause (nichts wird automatisch gebucht).
+- **Pausenpflicht (6 Std. am Stück):** Warnung 15 Min. vorher, erneut 5 Min. vorher; reagiert niemand, trägt das
+  Programm die Pause an der Grenze selbst ein (offene Pausenfenster schließen sich). Beendet wird sie nur per Klick.
 - **Statusvorlagen:** Rechtsklick → „Statusvorlagen“ zeigt die eigenen Vorlagen aus dem Intranet (Meine Zeiten → Teams):
   Teams-Status + Text für 5 Min. oder 15–300 Min., danach automatisch zurück oder nach Rückfrage; optional zugleich Pause buchen.
   „Teams wieder auf Verfügbar“ beendet eine Vorlage vorzeitig.

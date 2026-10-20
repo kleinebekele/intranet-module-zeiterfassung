@@ -36,7 +36,7 @@ func main() {
 		}
 		go aufraeumenNachUpdate()
 		merkeVersion()
-		a :=&App{spaeter: map[string]time.Time{}, erledigt: map[string]string{}, nachUpdate: true}
+		a := &App{spaeter: map[string]time.Time{}, erledigt: map[string]string{}, nachUpdate: true}
 		systray.Run(a.bereit, func() {})
 		return
 	}
@@ -74,14 +74,17 @@ type App struct {
 	erledigt   map[string]string    // Erinnerung für diesen Tag erledigt (Datum)
 	startOffen atomic.Bool          // „Später" bei der Startfrage gewählt
 
-	updateLaeuft atomic.Bool
-	nachUpdate   bool
-	abwesend     time.Time // Beginn der aktuellen Abwesenheit vom Rechner (unter merkerMu)
-	teamsVorher  string    // letzte gesehene Teams-Verfügbarkeit (unter mu)
-	pauseBis     time.Time // geplantes Pausenende aus dem Pausenfenster (unter merkerMu)
-	vorlageBis   time.Time // Statusvorlage mit Rückfrage läuft bis … (unter merkerMu)
-	vorlageName  string
-	vorlagen     []Vorlage // aktuelle Statusvorlagen (unter mu)
+	updateLaeuft    atomic.Bool
+	nachUpdate      bool
+	abwesend        time.Time // Beginn der aktuellen Abwesenheit vom Rechner (unter merkerMu)
+	teamsVorher     string    // letzte gesehene Teams-Verfügbarkeit (unter mu)
+	pauseBis        time.Time // geplantes Pausenende aus dem Pausenfenster (unter merkerMu)
+	pauseAbbruch    func()    // schließt offene Pausen-Dialoge (unter merkerMu)
+	pauseStufe      int       // 0 = noch nicht gewarnt, 1 = 15 Min. vorher, 2 = 5 Min. vorher (unter merkerMu)
+	autoPauseLaeuft atomic.Bool
+	vorlageBis      time.Time // Statusvorlage mit Rückfrage läuft bis … (unter merkerMu)
+	vorlageName     string
+	vorlagen        []Vorlage // aktuelle Statusvorlagen (unter mu)
 
 	mVorlagen, mOnline *systray.MenuItem
 	vorlagePunkte      []*systray.MenuItem
@@ -359,7 +362,7 @@ func (a *App) takt(t time.Time) {
 
 func (a *App) erinnern() {
 	s := a.aktuell()
-	if s == nil || a.dialog.Load() {
+	if s == nil {
 		return
 	}
 	jetzt := time.Now()
@@ -368,6 +371,13 @@ func (a *App) erinnern() {
 	if s.Zustand == "da" {
 		heuteMin += vergangen
 		block += vergangen
+	}
+	// Pausenpflicht: Warnungen und automatische Pause – auch wenn gerade ein Fenster offen ist.
+	if a.pausenpflicht(s, block) {
+		return
+	}
+	if a.dialog.Load() {
+		return
 	}
 
 	switch s.Zustand {
@@ -396,8 +406,6 @@ func (a *App) erinnern() {
 			go a.maxErreicht(heuteMin)
 		case maxTag > 0 && heuteMin >= maxTag-15 && a.einmal("max-bald"):
 			a.hinweis("In etwa 15 Minuten erreichst du die Höchstarbeitszeit von " + dauer(maxTag) + " Std.")
-		case s.Regeln.MaxBlock > 0 && block >= s.Regeln.MaxBlock-15 && a.faellig("pause"):
-			go a.erinnerung("pause", "Du arbeitest seit "+dauer(block)+" Std. ohne Pause.\nNach 6 Std. ist eine Pause Pflicht.\n\nPause jetzt starten?", "Pause starten", 15*time.Minute, "pause")
 		default:
 			if grund := feierabendGrund(s, heuteMin, jetzt); grund != "" && a.faellig("feierabend") {
 				go a.erinnerung("feierabend", grund+"\n\nFeierabend? Gehen buchen?", "Gehen", 30*time.Minute, "gehen")
@@ -437,10 +445,10 @@ const (
 )
 
 // Ja/Nein(/Extra)-Frage; nur eine gleichzeitig.
-func (a *App) frage(text, ja, nein, extra string) antwortArt {
+func (a *App) frage(text, ja, nein, extra string, mehr ...zenity.Option) antwortArt {
 	a.dialog.Store(true)
 	defer a.dialog.Store(false)
-	opts := []zenity.Option{zenity.Title(titel), zenity.OKLabel(ja), zenity.CancelLabel(nein)}
+	opts := append([]zenity.Option{zenity.Title(titel), zenity.OKLabel(ja), zenity.CancelLabel(nein)}, mehr...)
 	if extra != "" {
 		opts = append(opts, zenity.ExtraButton(extra))
 	}
