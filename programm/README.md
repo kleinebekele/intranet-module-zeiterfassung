@@ -13,8 +13,9 @@ sonst Tagessoll, sonst Ende der Kernzeit) und die Höchstarbeitszeit – gebucht
   „Arbeitsende um …?“. Solange gesperrt, keine Erinnerungen. „Beenden“ über das Menü fragt nach „Gehen“.
 - **Pause:** Fenster mit 15/30/45/60 Min. und – bei gekoppeltem Teams – Statusnachricht. Nach der gewählten Dauer
   fragt das Programm nur „Pause beenden?“; ohne Antwort bleibt es Pause (nichts wird automatisch gebucht).
-- **Mouseover am Uhr-Symbol:** heutige Abschnitte untereinander mit den Pausen dazwischen (unter 15 Min. „zu kurz“),
-  nächste Pflichtpause und Feierabend. Windows zeigt höchstens 127 Zeichen – ältere Abschnitte fallen dann weg.
+- **Tagesübersicht** (Mouseover am Uhr-Symbol und vollständig im Rechtsklick-Menü): heutige Abschnitte mit Dauer,
+  Pausen dazwischen (unter 15 Min. „zu kurz“), nächste fällige Pause (6 Std. am Stück, 30 Min. ab 6 Std., 45 Min. ab
+  9 Std.) und Feierabend. Der Mouseover fasst höchstens 127 Zeichen – ältere Abschnitte fallen dort weg.
 - **Pausenpflicht (6 Std. am Stück):** Warnung 15 Min. vorher, erneut 5 Min. vorher; reagiert niemand, trägt das
   Programm die Pause an der Grenze selbst ein (offene Pausenfenster schließen sich). Beendet wird sie nur per Klick.
 - **Statusvorlagen:** Rechtsklick → „Statusvorlagen“ zeigt die eigenen Vorlagen aus dem Intranet (Meine Zeiten → Teams):

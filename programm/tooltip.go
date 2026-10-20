@@ -5,15 +5,42 @@ import (
 	"strings"
 	"time"
 	"unicode/utf16"
+
+	"fyne.io/systray"
 )
 
-// Mouseover am Uhr-Symbol: Zustand, heutige Abschnitte untereinander mit den Pausen dazwischen,
-// nächste Pflichtpause und Feierabend. Windows zeigt höchstens 127 Zeichen – reicht der Platz
-// nicht, fallen die ältesten Abschnitte weg („…").
+// Tagesübersicht: Stunden bisher, heutige Abschnitte untereinander (mit Dauer) und die Pausen
+// dazwischen, nächste fällige Pause und Feierabend. Steht im Mouseover am Uhr-Symbol und
+// vollständig im Rechtsklick-Menü – Windows zeigt im Mouseover höchstens 127 Zeichen, dort
+// fallen deshalb die ältesten Abschnitte weg („…").
 const tooltipMax = 127
 
-func (a *App) tooltipText(s *Status, kopf string) string {
-	var abschnitte []string
+const tagesPlaetze = 24 // Menüzeilen auf Vorrat (systray kann Punkte nur verstecken)
+
+func (a *App) tagesMenueAnlegen() {
+	for n := 0; n < tagesPlaetze; n++ {
+		punkt := systray.AddMenuItem("", "")
+		punkt.Disable()
+		punkt.Hide()
+		a.tagesPunkte = append(a.tagesPunkte, punkt)
+	}
+}
+
+func (a *App) tagesMenueSetzen(zeilen []string) {
+	for n, punkt := range a.tagesPunkte {
+		if n < len(zeilen) {
+			punkt.SetTitle(zeilen[n])
+			punkt.Show()
+		} else {
+			punkt.Hide()
+		}
+	}
+}
+
+// Kopf, Abschnitte (mit Pausen) und Fuß der Übersicht.
+func (a *App) tagesZeilen(s *Status, jetzt time.Time) (kopf string, abschnitte, fuss []string) {
+	kopf = "Heute bisher " + dauer(a.heuteBisher(s, jetzt)) + " Std."
+
 	var letztesEnde time.Time
 	for n, z := range s.Abschnitte {
 		von, okVon := heuteUm(z.Von)
@@ -22,27 +49,36 @@ func (a *App) tooltipText(s *Status, kopf string) string {
 				abschnitte = append(abschnitte, "Pause "+pauseText(p))
 			}
 		}
-		bis := z.Bis
-		if bis == "" {
-			bis = "jetzt"
-		} else if t, ok := heuteUm(z.Bis); ok {
-			letztesEnde = t
+		bis, okBis := heuteUm(z.Bis)
+		if z.Bis == "" {
+			bis, okBis = jetzt, true
 		}
-		if s.Zustand == "pause" && n == len(s.Abschnitte)-1 && z.Bis != "" {
-			abschnitte = append(abschnitte, z.Von+"–"+bis, "Pause seit "+z.Bis)
-			continue
+		zeile := z.Von + "–" + z.Bis
+		if z.Bis == "" {
+			zeile = z.Von + "–jetzt"
 		}
-		abschnitte = append(abschnitte, z.Von+"–"+bis)
+		if okVon && okBis && !bis.Before(von) {
+			zeile += " (" + dauerKurz(int(bis.Sub(von).Minutes())) + ")"
+		}
+		abschnitte = append(abschnitte, zeile)
+		if z.Bis != "" {
+			letztesEnde = bis
+		}
+	}
+	if s.Zustand == "pause" && !letztesEnde.IsZero() {
+		abschnitte = append(abschnitte, "Pause seit "+letztesEnde.Format("15:04")+" Uhr")
 	}
 
-	var fuss []string
-	if p := a.naechstePause(s); p != "" {
-		fuss = append(fuss, "Pause fällig "+p)
+	if p := a.naechstePause(s, jetzt); p != "" {
+		fuss = append(fuss, "nächste Pause fällig "+p)
 	}
-	if f := a.feierabend(s); f != "" {
+	if f := a.feierabend(s, jetzt); f != "" {
 		fuss = append(fuss, "Feierabend "+f)
 	}
+	return kopf, abschnitte, fuss
+}
 
+func (a *App) tooltipText(kopf string, abschnitte, fuss []string) string {
 	for weg := 0; ; weg++ {
 		zeilen := []string{kopf}
 		if weg > 0 {
@@ -57,38 +93,88 @@ func (a *App) tooltipText(s *Status, kopf string) string {
 	}
 }
 
-func pauseText(m int) string {
-	text := strconv.Itoa(m) + " Min."
-	if m >= 60 {
-		text = dauer(m) + " Std."
+// „22 Min." bzw. „4:07 Std."
+func dauerKurz(m int) string {
+	if m < 60 {
+		return strconv.Itoa(m) + " Min."
 	}
+	return dauer(m) + " Std."
+}
+
+func pauseText(m int) string {
+	text := dauerKurz(m)
 	if m < 15 {
 		text += " (zu kurz)" // zählt nicht als Ruhepause (§ 4 ArbZG)
 	}
 	return text
 }
 
-// Uhrzeit, zu der 6 Std. am Stück erreicht sind (nur wenn eingestempelt).
-func (a *App) naechstePause(s *Status) string {
-	if s.Zustand != "da" || s.Regeln.MaxBlock <= 0 {
+// Arbeitsminuten heute bis jetzt (der Status ist bis zu zwei Minuten alt).
+func (a *App) heuteBisher(s *Status, jetzt time.Time) int {
+	if s.Zustand == "da" {
+		return s.HeuteMinuten + int(jetzt.Sub(a.geholtAm).Minutes())
+	}
+	return s.HeuteMinuten
+}
+
+// Ruhepausen heute: Lücken ab 15 Minuten zwischen den Abschnitten.
+func ruhepausen(s *Status) int {
+	summe := 0
+	for n := 1; n < len(s.Abschnitte); n++ {
+		ende, ok1 := heuteUm(s.Abschnitte[n-1].Bis)
+		von, ok2 := heuteUm(s.Abschnitte[n].Von)
+		if p := int(von.Sub(ende).Minutes()); ok1 && ok2 && p >= 15 {
+			summe += p
+		}
+	}
+	return summe
+}
+
+// Nächste fällige Pause (§ 4 ArbZG), nur wenn eingestempelt – das früheste von:
+// 6 Std. am Stück, 6 Std. am Tag ohne 30 Min. Pause, 9 Std. am Tag ohne 45 Min. Pause.
+func (a *App) naechstePause(s *Status, jetzt time.Time) string {
+	if s.Zustand != "da" {
 		return ""
 	}
-	return a.geholtAm.Add(time.Duration(s.Regeln.MaxBlock-s.BlockMinuten) * time.Minute).Format("15:04")
+	heute, pause := a.heuteBisher(s, jetzt), ruhepausen(s)
+	rest := -1
+	nimm := func(m int) {
+		if rest < 0 || m < rest {
+			rest = max(m, 0)
+		}
+	}
+	if s.Regeln.MaxBlock > 0 {
+		nimm(s.Regeln.MaxBlock - (s.BlockMinuten + int(jetzt.Sub(a.geholtAm).Minutes())))
+	}
+	if pause < 30 {
+		nimm(360 - heute)
+	}
+	if pause < 45 {
+		nimm(540 - heute)
+	}
+	if rest < 0 {
+		return ""
+	}
+	if rest == 0 {
+		return "jetzt"
+	}
+	return jetzt.Add(time.Duration(rest)*time.Minute).Format("15:04") + " Uhr"
 }
 
 // Schichtende laut Dienstplan, sonst Tagessoll erreicht, sonst Ende der Kernzeit.
-func (a *App) feierabend(s *Status) string {
+func (a *App) feierabend(s *Status, jetzt time.Time) string {
+	heute := a.heuteBisher(s, jetzt)
 	switch {
 	case s.Schicht != nil:
-		return s.Schicht.Bis
-	case s.SollHeute > 0 && s.HeuteMinuten >= s.SollHeute:
-		return "Soll erreicht"
+		return s.Schicht.Bis + " Uhr"
+	case s.SollHeute > 0 && heute >= s.SollHeute:
+		return "– Soll erreicht"
 	case s.SollHeute > 0 && s.Zustand == "da":
-		return a.geholtAm.Add(time.Duration(s.SollHeute-s.HeuteMinuten) * time.Minute).Format("15:04")
+		return jetzt.Add(time.Duration(s.SollHeute-heute)*time.Minute).Format("15:04") + " Uhr"
 	case s.SollHeute > 0:
-		return "in " + dauer(s.SollHeute-s.HeuteMinuten) + " Std."
+		return "in " + dauer(s.SollHeute-heute) + " Std."
 	case s.Kern != nil:
-		return s.Kern.Bis
+		return s.Kern.Bis + " Uhr"
 	}
 	return ""
 }

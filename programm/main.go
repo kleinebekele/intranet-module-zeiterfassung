@@ -87,6 +87,7 @@ type App struct {
 	vorlagen        []Vorlage // aktuelle Statusvorlagen (unter mu)
 
 	mVorlagen, mOnline *systray.MenuItem
+	tagesPunkte        []*systray.MenuItem // Tagesübersicht unter der Statuszeile
 	vorlagePunkte      []*systray.MenuItem
 
 	mStatus, mKommen, mPause, mWeiter, mGehen, mOeffnen, mVerbindung, mAutostart, mBeenden *systray.MenuItem
@@ -101,6 +102,7 @@ func (a *App) bereit() {
 
 	a.mStatus = systray.AddMenuItem("Verbinde …", "")
 	a.mStatus.Disable()
+	a.tagesMenueAnlegen()
 	systray.AddSeparator()
 	a.mKommen = systray.AddMenuItem("Kommen", "Arbeitszeit starten")
 	a.mPause = systray.AddMenuItem("Pause", "Pause beginnen")
@@ -682,6 +684,7 @@ func (a *App) menueSetzen() {
 		m.Disable()
 	}
 	if s == nil {
+		a.tagesMenueSetzen(nil)
 		return
 	}
 	for _, akt := range s.Aktionen {
@@ -703,7 +706,9 @@ func (a *App) menueSetzen() {
 	text := map[string]string{"da": "Da" + seit, "pause": "Pause" + seit, "weg": "Nicht eingestempelt"}[s.Zustand]
 	text += " · heute " + dauer(s.HeuteMinuten) + " Std."
 	a.mStatus.SetTitle(text)
-	systray.SetTooltip(a.tooltipText(s, "Heute "+dauer(s.HeuteMinuten)+" Std."))
+	kopf, abschnitte, fuss := a.tagesZeilen(s, time.Now())
+	systray.SetTooltip(a.tooltipText(kopf, abschnitte, fuss))
+	a.tagesMenueSetzen(append(abschnitte, fuss...))
 	switch s.Zustand {
 	case "da":
 		systray.SetIcon(symbol(farbeDa))
