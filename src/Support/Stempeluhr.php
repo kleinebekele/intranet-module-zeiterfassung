@@ -47,7 +47,7 @@ class Stempeluhr
             'zustand' => $zustand,
             'seit' => $offen?->beginn ?? $letzter?->ende,
             'heute' => $heute->sum(fn (Buchung $b) => $b->minuten($jetzt)),
-            'block' => $offen ? Rechner::laengsterBlock($heute, $jetzt) : 0,
+            'block' => $offen ? Rechner::aktuellerBlock($heute, $jetzt) : 0,
             'aktionen' => match ($zustand) {
                 'da' => ['pause', 'gehen'],
                 'pause' => ['weiter', 'gehen'],

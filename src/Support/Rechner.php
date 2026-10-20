@@ -184,6 +184,28 @@ class Rechner
     }
 
     /**
+     * Der laufende Block: Minuten seit der letzten Ruhepause (Lücke ab 15 Minuten) bis zum
+     * Ende des letzten Abschnitts bzw. jetzt. Für Warnungen „bitte Pause machen" – ein zu
+     * langer Block von heute Vormittag ist nach einer Pause erledigt (steht im Tagesverstoß).
+     *
+     * @param  Collection<int, Buchung>  $abschnitte
+     */
+    public static function aktuellerBlock(Collection $abschnitte, ?Carbon $jetzt = null): int
+    {
+        $start = null;
+        $ende = null;
+
+        foreach ($abschnitte as $b) {
+            if ($start === null || intdiv($b->beginn->getTimestamp() - $ende->getTimestamp(), 60) >= 15) {
+                $start = $b->beginn;
+            }
+            $ende = $b->ende ?? ($jetzt ?? now());
+        }
+
+        return $start ? intdiv($ende->getTimestamp() - $start->getTimestamp(), 60) : 0;
+    }
+
+    /**
      * @param  list<Tag>  $tage
      * @return array{soll: int, ist: int, gutschrift: int, saldo: int, pause: int}
      */
