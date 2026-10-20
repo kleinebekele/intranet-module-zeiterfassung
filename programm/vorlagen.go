@@ -71,8 +71,10 @@ func (a *App) vorlagenMenueSetzen(s *Status) {
 		return
 	}
 	a.mu.Lock()
+	// Das Intranet schickt Vorlagen nur bei gekoppeltem Teams. Ein Fehler beim Lesen des
+	// Teams-Status (s.Teams leer) darf das Menü nicht verstecken.
 	a.vorlagen = nil
-	if s != nil && s.Teams != nil {
+	if s != nil {
 		a.vorlagen = s.Vorlagen
 	}
 	liste := a.vorlagen
