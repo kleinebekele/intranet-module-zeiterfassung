@@ -36,7 +36,7 @@ func (a *App) vergessenePause() bool {
 		dauern = append(dauern, dauerText(m))
 	}
 	a.dialog.Store(true)
-	wahl, err := zenity.List("Wie lange war die Pause?", dauern, zenity.Title(titel),
+	wahl, err := zenity.List("Wie lange war die Pause?", dauern, zenity.Title(titel), fensterSymbol(),
 		zenity.DefaultItems(dauerText(30)), zenity.OKLabel("Weiter"), zenity.CancelLabel("Abbrechen"))
 	a.dialog.Store(false)
 	if err != nil || wahl == "" {
@@ -59,7 +59,7 @@ func (a *App) vergessenePause() bool {
 	}
 	for {
 		a.dialog.Store(true)
-		eingabe, err := zenity.Entry("Wann hat die Pause begonnen? (HH:MM)", zenity.Title(titel),
+		eingabe, err := zenity.Entry("Wann hat die Pause begonnen? (HH:MM)", zenity.Title(titel), fensterSymbol(),
 			zenity.EntryText(vorschlag), zenity.OKLabel("Pause eintragen"), zenity.CancelLabel("Abbrechen"))
 		a.dialog.Store(false)
 		if err != nil {

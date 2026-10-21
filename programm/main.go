@@ -49,11 +49,11 @@ func main() {
 	if err != nil {
 		protokoll("Installation: " + err.Error())
 		if !einzigeInstanz() {
-			_ = zenity.Info("Die Zeiterfassung läuft bereits.\n\nZum Aktualisieren erst über das Uhr-Symbol unten rechts „Beenden“ wählen und diese Datei dann erneut starten.", zenity.Title(titel))
+			_ = zenity.Info("Die Zeiterfassung läuft bereits.\n\nZum Aktualisieren erst über das Uhr-Symbol unten rechts „Beenden“ wählen und diese Datei dann erneut starten.", zenity.Title(titel), fensterSymbol())
 			return
 		}
 	} else if !einzigeInstanz() {
-		_ = zenity.Info("Die Zeiterfassung läuft bereits – das Uhr-Symbol findest du unten rechts neben der Uhrzeit.", zenity.Title(titel))
+		_ = zenity.Info("Die Zeiterfassung läuft bereits – das Uhr-Symbol findest du unten rechts neben der Uhrzeit.", zenity.Title(titel), fensterSymbol())
 		return
 	}
 
@@ -223,24 +223,24 @@ func (a *App) einrichten(erstesMal bool) bool {
 			"1. Im Intranet „Zeiterfassung → Meine Zeiten“ öffnen.\n"+
 			"2. In der Karte „PC-Programm“ einen Gerätenamen eingeben und „Gerät verbinden“ klicken.\n"+
 			"3. Den angezeigten Verbindungscode kopieren und im nächsten Fenster einfügen.",
-			zenity.Title(titel), zenity.OKLabel("Weiter"))
+			zenity.Title(titel), fensterSymbol(), zenity.OKLabel("Weiter"))
 	}
 
 	for {
-		code, err := zenity.Entry("Verbindungscode einfügen:", zenity.Title(titel), zenity.OKLabel("Verbinden"), zenity.CancelLabel("Abbrechen"))
+		code, err := zenity.Entry("Verbindungscode einfügen:", zenity.Title(titel), fensterSymbol(), zenity.OKLabel("Verbinden"), zenity.CancelLabel("Abbrechen"))
 		if err != nil {
 			return false
 		}
 		adresse, schluessel := zerlegeCode(code)
 		// Notfalls einzeln: nur Schlüssel oder nur Adresse eingefügt.
 		if adresse == "" && schluessel != "" {
-			if adresse, err = zenity.Entry("Adresse des Intranets:", zenity.Title(titel), zenity.OKLabel("Weiter"), zenity.CancelLabel("Abbrechen")); err != nil {
+			if adresse, err = zenity.Entry("Adresse des Intranets:", zenity.Title(titel), fensterSymbol(), zenity.OKLabel("Weiter"), zenity.CancelLabel("Abbrechen")); err != nil {
 				return false
 			}
 			adresse, _ = zerlegeCode(adresse)
 		}
 		if schluessel == "" && adresse != "" {
-			if schluessel, err = zenity.Entry("Schlüssel (beginnt mit zg_):", zenity.Title(titel), zenity.OKLabel("Verbinden"), zenity.CancelLabel("Abbrechen")); err != nil {
+			if schluessel, err = zenity.Entry("Schlüssel (beginnt mit zg_):", zenity.Title(titel), fensterSymbol(), zenity.OKLabel("Verbinden"), zenity.CancelLabel("Abbrechen")); err != nil {
 				return false
 			}
 			schluessel = strings.TrimSpace(schluessel)
@@ -248,17 +248,17 @@ func (a *App) einrichten(erstesMal bool) bool {
 
 		i := NeuesIntranet(adresse, schluessel)
 		if err := i.Pruefen(); err != nil {
-			_ = zenity.Error("Verbindung hat nicht geklappt:\n\n"+err.Error()+"\n\nBitte den Verbindungscode im Intranet neu kopieren (ggf. Gerät trennen und neu verbinden).", zenity.Title(titel))
+			_ = zenity.Error("Verbindung hat nicht geklappt:\n\n"+err.Error()+"\n\nBitte den Verbindungscode im Intranet neu kopieren (ggf. Gerät trennen und neu verbinden).", zenity.Title(titel), fensterSymbol())
 			continue
 		}
 		if err := speichereEinstellungen(Einstellungen{Adresse: i.Adresse, Schluessel: i.Schluessel}); err != nil {
-			_ = zenity.Error("Einstellungen ließen sich nicht speichern: "+err.Error(), zenity.Title(titel))
+			_ = zenity.Error("Einstellungen ließen sich nicht speichern: "+err.Error(), zenity.Title(titel), fensterSymbol())
 			return false
 		}
 		a.mu.Lock()
 		a.intranet = i
 		a.mu.Unlock()
-		_ = zenity.Info("Verbunden!\n\nDie Zeiterfassung startet ab jetzt mit Windows.\nDas Uhr-Symbol findest du unten rechts neben der Uhrzeit (ggf. unter dem kleinen Pfeil ^).", zenity.Title(titel))
+		_ = zenity.Info("Verbunden!\n\nDie Zeiterfassung startet ab jetzt mit Windows.\nDas Uhr-Symbol findest du unten rechts neben der Uhrzeit (ggf. unter dem kleinen Pfeil ^).", zenity.Title(titel), fensterSymbol())
 		return true
 	}
 }
@@ -450,7 +450,7 @@ const (
 func (a *App) frage(text, ja, nein, extra string, mehr ...zenity.Option) antwortArt {
 	a.dialog.Store(true)
 	defer a.dialog.Store(false)
-	opts := append([]zenity.Option{zenity.Title(titel), zenity.OKLabel(ja), zenity.CancelLabel(nein)}, mehr...)
+	opts := append([]zenity.Option{zenity.Title(titel), fensterSymbol(), zenity.OKLabel(ja), zenity.CancelLabel(nein)}, mehr...)
 	if extra != "" {
 		opts = append(opts, zenity.ExtraButton(extra))
 	}
@@ -517,7 +517,7 @@ func (a *App) erneutErinnern(schluessel string) {
 	a.dialog.Store(true)
 	wahl, err := zenity.List("In wie vielen Minuten erneut erinnern?",
 		[]string{"5 Minuten", "10 Minuten", "15 Minuten", "20 Minuten", "30 Minuten", "45 Minuten", "60 Minuten"},
-		zenity.Title(titel), zenity.DefaultItems("10 Minuten"), zenity.OKLabel("Erinnern"), zenity.CancelLabel("Abbrechen"))
+		zenity.Title(titel), fensterSymbol(), zenity.DefaultItems("10 Minuten"), zenity.OKLabel("Erinnern"), zenity.CancelLabel("Abbrechen"))
 	a.dialog.Store(false)
 	minuten := 10
 	if err == nil {
@@ -549,7 +549,7 @@ func (a *App) endeVorschlagen(ende time.Time, grund string) {
 			return
 		}
 		a.dialog.Store(true)
-		eingabe, err := zenity.Entry("Wann hast du aufgehört? (TT.MM. HH:MM)", zenity.Title(titel), zenity.EntryText(ende.Format("02.01. 15:04")), zenity.OKLabel("Eintragen"), zenity.CancelLabel("Abbrechen"))
+		eingabe, err := zenity.Entry("Wann hast du aufgehört? (TT.MM. HH:MM)", zenity.Title(titel), fensterSymbol(), zenity.EntryText(ende.Format("02.01. 15:04")), zenity.OKLabel("Eintragen"), zenity.CancelLabel("Abbrechen"))
 		a.dialog.Store(false)
 		if err != nil {
 			return
@@ -618,20 +618,20 @@ func (a *App) ergebnis(meldung string, err error) {
 		a.fehler(err.Error())
 		return
 	}
-	_ = zenity.Notify(meldung, zenity.Title(titel))
+	_ = zenity.Notify(meldung, zenity.Title(titel), fensterSymbol())
 }
 
 func (a *App) hinweis(text string) {
 	a.dialog.Store(true)
 	defer a.dialog.Store(false)
-	_ = zenity.Info(text, zenity.Title(titel))
+	_ = zenity.Info(text, zenity.Title(titel), fensterSymbol())
 }
 
 func (a *App) fehler(text string) {
 	protokoll("Fehler: " + text)
 	a.dialog.Store(true)
 	defer a.dialog.Store(false)
-	_ = zenity.Error(text, zenity.Title(titel))
+	_ = zenity.Error(text, zenity.Title(titel), fensterSymbol())
 }
 
 func (a *App) aktuell() *Status {

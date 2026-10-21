@@ -108,6 +108,6 @@ func (a *App) autoPause(block int) {
 	a.dialog.Store(true)
 	_ = zenity.Info("Du hast "+dauer(block)+" Std. ohne Pause gearbeitet.\n\n"+
 		"Die Pause wurde um "+jetzt.Format("15:04")+" Uhr automatisch eingetragen (§ 4 ArbZG).\n"+
-		"Damit sie zählt, beende sie frühestens nach 15 Minuten.", zenity.Title(titel))
+		"Damit sie zählt, beende sie frühestens nach 15 Minuten.", zenity.Title(titel), fensterSymbol())
 	a.dialog.Store(false)
 }

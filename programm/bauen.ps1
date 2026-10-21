@@ -11,6 +11,17 @@ if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "VERSION ungültig: $version" 
 
 $env:GOOS = 'windows'
 $env:GOARCH = 'amd64'
+# Programmsymbol (die Uhr) in die exe einbetten – sonst zeigt Windows in Taskleiste und Explorer
+# das leere Standardsymbol. go-winres lädt Go beim ersten Mal selbst in den Go-Cache.
+$env:ZE_SYMBOL = '1'
+go test -run TestSymbolDatei .
+Remove-Item Env:\ZE_SYMBOL
+if ($LASTEXITCODE) { throw 'Symbol erzeugen fehlgeschlagen' }
+go run github.com/tc-hib/go-winres@v0.3.3 simply --arch amd64 --manifest none --icon winres/symbol.png `
+    --product-name Zeiterfassung --file-description Zeiterfassung --original-filename Zeiterfassung.exe `
+    --product-version $version --file-version $version
+if ($LASTEXITCODE) { throw 'go-winres fehlgeschlagen' }
+
 go vet ./...
 if ($LASTEXITCODE) { throw 'go vet fehlgeschlagen' }
 go test ./...

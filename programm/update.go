@@ -151,5 +151,5 @@ func aufraeumenNachUpdate() {
 }
 
 func meldeUpdate() {
-	_ = zenity.Notify("Die Zeiterfassung wurde auf Version "+Version+" aktualisiert.", zenity.Title(titel))
+	_ = zenity.Notify("Die Zeiterfassung wurde auf Version "+Version+" aktualisiert.", zenity.Title(titel), fensterSymbol())
 }

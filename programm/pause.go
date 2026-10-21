@@ -18,7 +18,7 @@ func (a *App) pauseStarten() {
 	a.dialog.Store(true)
 	wahl, err := zenity.List("Wie lange machst du Pause?",
 		[]string{"15 Minuten", "30 Minuten", "45 Minuten", "60 Minuten"},
-		zenity.Title(titel), zenity.DefaultItems("30 Minuten"), zenity.OKLabel("Pause starten"), zenity.CancelLabel("Abbrechen"), zenity.Context(ctx))
+		zenity.Title(titel), fensterSymbol(), zenity.DefaultItems("30 Minuten"), zenity.OKLabel("Pause starten"), zenity.CancelLabel("Abbrechen"), zenity.Context(ctx))
 	a.dialog.Store(false)
 	if err != nil || strings.TrimSpace(wahl) == "" {
 		return
@@ -29,7 +29,7 @@ func (a *App) pauseStarten() {
 	extra := url.Values{}
 	if s := a.aktuell(); s != nil && s.Teams != nil {
 		a.dialog.Store(true)
-		nachricht, err := zenity.Entry("Statusnachricht für Teams (leer = keine):", zenity.Title(titel),
+		nachricht, err := zenity.Entry("Statusnachricht für Teams (leer = keine):", zenity.Title(titel), fensterSymbol(),
 			zenity.EntryText("In der Pause – zurück um "+bis.Format("15:04")),
 			zenity.OKLabel("Pause starten"), zenity.CancelLabel("Ohne Nachricht"), zenity.Context(ctx))
 		a.dialog.Store(false)
