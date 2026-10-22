@@ -32,11 +32,11 @@ func (a *App) teamsNachfragen(wechsel string) {
 	}
 	switch wechsel {
 	case "offline":
-		if a.frage("Dein Teams steht jetzt auf „Offline“.\n\nArbeitszeit beenden (Gehen buchen)?", "Ja, Gehen buchen", "Nein, ich arbeite weiter", "") == antwortJa {
+		if a.frage("Dein Teams steht jetzt auf „Offline“.\n\nArbeitszeit beenden (Gehen buchen)?", "Ja, Gehen", "Nein", "") == antwortJa {
 			a.stempeln("gehen")
 		}
 	case "online":
-		if a.frage("Dein Teams ist wieder online.\n\nArbeitszeit starten (Kommen buchen)?", "Ja, Kommen buchen", "Nein", "") == antwortJa {
+		if a.frage("Dein Teams ist wieder online.\n\nArbeitszeit starten (Kommen buchen)?", "Ja, Kommen", "Nein", "") == antwortJa {
 			a.stempeln("kommen")
 		}
 	}

@@ -122,9 +122,9 @@ func (a *App) abwesenheitKlaeren(von, bis time.Time, grund string, abPause time.
 		return
 	}
 
-	text := fmt.Sprintf("%s – von %s bis %s Uhr (%s Std.).\n\nWar das eine Pause?",
+	text := fmt.Sprintf("%s – von %s bis %s Uhr (%s Std.).\n\nWar das eine Pause oder Arbeitszeit?",
 		grund, von.Format("15:04"), bis.Format("15:04"), dauer(int(dauerAbwesend.Minutes())))
-	if a.frage(text, "Ja, als Pause eintragen", "Nein, das war Arbeitszeit", "") != antwortJa {
+	if a.frage(text, "Pause", "Arbeitszeit", "") != antwortJa {
 		protokoll("Abwesenheit " + von.Format("15:04") + "–" + bis.Format("15:04") + " bleibt Arbeitszeit")
 		a.pflichtpauseNachtragen(von, bis)
 		return
@@ -160,7 +160,7 @@ func (a *App) pflichtpauseNachtragen(von, bis time.Time) {
 		beginn := von
 		a.dialog.Store(true)
 		eingabe, err := zenity.Entry("Beginn der Pause (HH:MM):", zenity.Title(titel), fensterSymbol(),
-			zenity.EntryText(von.Format("15:04")), zenity.OKLabel("Pause eintragen"), zenity.CancelLabel("Abbrechen"))
+			zenity.EntryText(von.Format("15:04")), zenity.OKLabel("Eintragen"), zenity.CancelLabel("Abbrechen"))
 		a.dialog.Store(false)
 		if err == nil {
 			t, ok := heuteUm(strings.TrimSpace(eingabe))

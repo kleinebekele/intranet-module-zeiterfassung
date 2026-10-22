@@ -165,7 +165,7 @@ func (a *App) vorlageErinnern() {
 		return
 	}
 	go func() {
-		if a.frage("Die Statusvorlage „"+name+"“ ist abgelaufen.\n\nTeams wieder auf „Verfügbar“ stellen?", "Ja, verfügbar", "Erneut erinnern …", "") == antwortJa {
+		if a.frage("Die Statusvorlage „"+name+"“ ist abgelaufen.\n\nTeams wieder auf „Verfügbar“ stellen – oder später erneut erinnern?", "Verfügbar", "Später …", "") == antwortJa {
 			a.teamsZurueck()
 			return
 		}
@@ -236,15 +236,15 @@ func (a *App) vorlageAnlegen() {
 	}
 
 	rueckkehr := "frage"
-	err = zenity.Question("Nach "+dauerText(minuten)+" Teams wieder auf „Verfügbar“ stellen:",
-		zenity.Title(titel+" – Neue Statusvorlage"), fensterSymbol(), zenity.OKLabel("Nach Rückfrage"), zenity.CancelLabel("Automatisch"))
+	err = zenity.Question("Nach "+dauerText(minuten)+" Teams wieder auf „Verfügbar“ stellen –\nautomatisch oder erst nach Rückfrage?",
+		zenity.Title(titel+" – Neue Statusvorlage"), fensterSymbol(), zenity.OKLabel("Nachfragen"), zenity.CancelLabel("Automatisch"))
 	if err != nil {
 		rueckkehr = "automatisch"
 	}
 
 	pause := "0"
 	if zenity.Question("Zugleich eine Pause buchen?", zenity.Title(titel+" – Neue Statusvorlage"), fensterSymbol(),
-		zenity.OKLabel("Ja, Pause buchen"), zenity.CancelLabel("Nein")) == nil {
+		zenity.OKLabel("Ja"), zenity.CancelLabel("Nein")) == nil {
 		pause = "1"
 	}
 

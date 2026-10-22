@@ -17,7 +17,7 @@ func (a *App) maxErreicht(heuteMin int) {
 	}
 	text := "Du hast heute " + dauer(heuteMin) + " Std. gearbeitet – das ist die gesetzliche Höchstarbeitszeit.\n\n" +
 		"Feierabend bestätigen – oder hast du zwischendurch eine Pause gemacht und vergessen, sie zu buchen?"
-	switch a.frage(text, "Feierabend (Gehen buchen)", "Später", "Pause vergessen") {
+	switch a.frage(text, "Feierabend", "Später", "Pause fehlt") {
 	case antwortJa:
 		a.stempeln("gehen")
 	case antwortExtra:
@@ -60,7 +60,7 @@ func (a *App) vergessenePause() bool {
 	for {
 		a.dialog.Store(true)
 		eingabe, err := zenity.Entry("Wann hat die Pause begonnen? (HH:MM)", zenity.Title(titel), fensterSymbol(),
-			zenity.EntryText(vorschlag), zenity.OKLabel("Pause eintragen"), zenity.CancelLabel("Abbrechen"))
+			zenity.EntryText(vorschlag), zenity.OKLabel("Eintragen"), zenity.CancelLabel("Abbrechen"))
 		a.dialog.Store(false)
 		if err != nil {
 			return false

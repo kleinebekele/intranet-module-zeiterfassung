@@ -315,7 +315,7 @@ func (a *App) startfragen(beat time.Time, beatOk bool) {
 		// Aus bzw. Neustart: bis 30 Min. bleibt es Arbeitszeit, danach Pause anbieten, ab 2 Std. Arbeitsende.
 		a.abwesenheitKlaeren(beat, time.Now(), "Der Rechner war aus oder wurde neu gestartet", neustartAbPause)
 	case s.Zustand == "da" && s.OffenSeitVortag:
-		if a.frage(fmt.Sprintf("Du bist seit %s eingestempelt – vermutlich vergessen auszustempeln.\n\nIm Intranet unter „Meine Zeiten“ korrigieren?", beginn.Local().Format("02.01. 15:04")), "Intranet öffnen", "Später", "") == antwortJa {
+		if a.frage(fmt.Sprintf("Du bist seit %s eingestempelt – vermutlich vergessen auszustempeln.\n\nIm Intranet unter „Meine Zeiten“ korrigieren?", beginn.Local().Format("02.01. 15:04")), "Korrigieren", "Später", "") == antwortJa {
 			if i := a.verbindung(); i != nil {
 				oeffneImBrowser(i.Adresse + "/modules/zeiterfassung/meine")
 			}
@@ -399,7 +399,7 @@ func (a *App) erinnern() {
 		}
 		a.merkerMu.Unlock()
 		if err == nil && !jetzt.Before(ende) && a.faellig("weiter") {
-			go a.erinnerung("weiter", "Deine Pause läuft seit "+dauer(int(jetzt.Sub(seit).Minutes()))+" Std.\n\nPause beenden und weiter arbeiten?", "Pause beenden", 0, "weiter")
+			go a.erinnerung("weiter", "Deine Pause läuft seit "+dauer(int(jetzt.Sub(seit).Minutes()))+" Std.\n\nPause beenden und weiter arbeiten?", "Ja, weiter", 0, "weiter")
 		}
 
 	case "da":
@@ -529,7 +529,7 @@ func (a *App) erinnerung(schluessel, text, ja string, ruhe time.Duration, aktion
 	}
 	nein := "Später"
 	if ruhe == 0 {
-		nein = "Erneut erinnern …"
+		nein = "Später …"
 	}
 	if a.frage(text, ja, nein, "") == antwortJa {
 		if aktion == "pause" {
@@ -570,9 +570,9 @@ func (a *App) endeVorschlagen(ende time.Time, grund string) {
 	if i == nil || s == nil {
 		return
 	}
-	text := fmt.Sprintf("%s ab %s Uhr – du warst da noch eingestempelt.\n\nArbeitsende um %s Uhr eintragen?",
+	text := fmt.Sprintf("%s ab %s Uhr – du warst da noch eingestempelt.\n\nArbeitsende um %s Uhr eintragen?\n(Nein = du hast weitergearbeitet)",
 		grund, ende.Format("02.01. 15:04"), ende.Format("15:04"))
-	switch a.frage(text, "Ja, so eintragen", "Nein, ich habe weitergearbeitet", "Andere Zeit") {
+	switch a.frage(text, "Eintragen", "Nein", "Andere Zeit") {
 	case antwortJa:
 		meldung, err := i.GehenNachtragen(ende, true)
 		a.ergebnis(meldung, err)
