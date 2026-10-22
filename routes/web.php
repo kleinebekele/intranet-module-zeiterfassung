@@ -118,5 +118,6 @@ Route::middleware([GeraetZugang::class, 'throttle:120,1'])
         Route::post('gehen-nachtragen', [AppController::class, 'gehenNachtragen'])->name('gehen');
         Route::post('pause-nachtragen', [AppController::class, 'pauseNachtragen'])->name('pause');
         Route::post('vorlage', [AppController::class, 'vorlage'])->name('vorlage');
+        Route::post('vorlage-anlegen', [AppController::class, 'vorlageAnlegen'])->name('vorlage.anlegen');
         Route::post('status-zuruecksetzen', [AppController::class, 'statusZuruecksetzen'])->name('zuruecksetzen');
     });

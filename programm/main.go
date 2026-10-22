@@ -87,9 +87,9 @@ type App struct {
 	vorlageName     string
 	vorlagen        []Vorlage // aktuelle Statusvorlagen (unter mu)
 
-	mVorlagen, mOnline *systray.MenuItem
-	tagesPunkte        []*systray.MenuItem // Tagesübersicht unter der Statuszeile
-	vorlagePunkte      []*systray.MenuItem
+	mVorlagen, mOnline, mNeueVorlage *systray.MenuItem
+	tagesPunkte                      []*systray.MenuItem // Tagesübersicht unter der Statuszeile
+	vorlagePunkte                    []*systray.MenuItem
 
 	mStatus, mKommen, mPause, mWeiter, mGehen, mOeffnen, mVerbindung, mAutostart, mBeenden *systray.MenuItem
 }

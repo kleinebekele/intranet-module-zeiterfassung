@@ -6,6 +6,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 use Intranet\Modules\Zeiterfassung\Models\Buchung;
 use Intranet\Modules\Zeiterfassung\Models\Dienstplan;
 use Intranet\Modules\Zeiterfassung\Models\Schicht;
@@ -157,6 +158,36 @@ class AppController
             'rueckfrage' => $vorlage->rueckkehr !== 'automatisch',
             'pause' => $vorlage->pause,
         ]);
+    }
+
+    /** Neue Statusvorlage aus dem PC-Programm (Rechtsklick → Statusvorlagen → Neue Statusvorlage). */
+    public function vorlageAnlegen(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $pruefung = Validator::make($request->all(), [
+            'name' => ['required', 'string', 'max:100'],
+            'minuten' => ['required', 'integer', 'in:'.implode(',', Statusvorlage::dauern())],
+            'verfuegbarkeit' => ['required', 'in:'.implode(',', array_keys(Statusvorlage::STATUS))],
+            'text' => ['nullable', 'string', 'max:280'],
+            'rueckkehr' => ['required', 'in:'.implode(',', array_keys(Statusvorlage::RUECKKEHR))],
+        ]);
+        if ($pruefung->fails()) {
+            return response()->json(['ok' => false, 'meldung' => $pruefung->errors()->first()], 422);
+        }
+        $data = $pruefung->validated();
+
+        $vorlage = Statusvorlage::create([
+            'user_id' => $user->id,
+            'position' => (int) Statusvorlage::where('user_id', $user->id)->max('position') + 1,
+            'name' => $data['name'],
+            'minuten' => $data['minuten'],
+            'verfuegbarkeit' => $data['verfuegbarkeit'],
+            'text' => $data['text'] ?? null,
+            'rueckkehr' => $data['rueckkehr'],
+            'pause' => $request->boolean('pause'),
+        ]);
+
+        return response()->json(['ok' => true, 'meldung' => 'Statusvorlage „'.$vorlage->name.'“ gespeichert.']);
     }
 
     /** Teams zurück auf online (nach einer Statusvorlage mit Rückfrage). */

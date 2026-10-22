@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"fyne.io/systray"
+	"github.com/ncruces/zenity"
 )
 
 // Statusvorlagen aus dem Intranet (Meine Zeiten → Teams): Rechtsklick → Statusvorlagen.
@@ -56,6 +58,12 @@ func (a *App) vorlagenMenueAnlegen() {
 			}
 		}(n, punkt)
 	}
+	a.mNeueVorlage = a.mVorlagen.AddSubMenuItem("Neue Statusvorlage …", "Vorlage hier anlegen (wie im Intranet)")
+	go func() {
+		for range a.mNeueVorlage.ClickedCh {
+			go a.vorlageAnlegen()
+		}
+	}()
 	a.mOnline = a.mVorlagen.AddSubMenuItem("Teams wieder auf „Verfügbar“", "Vorlage beenden")
 	go func() {
 		for range a.mOnline.ClickedCh {
@@ -80,7 +88,8 @@ func (a *App) vorlagenMenueSetzen(s *Status) {
 	liste := a.vorlagen
 	a.mu.Unlock()
 
-	if len(liste) == 0 {
+	// Auch ohne Vorlagen zeigen, wenn Teams gekoppelt ist – dann gibt es „Neue Statusvorlage …“.
+	if len(liste) == 0 && (s == nil || s.Teams == nil) {
 		a.mVorlagen.Hide()
 		return
 	}
@@ -162,4 +171,96 @@ func (a *App) vorlageErinnern() {
 		}
 		a.erneutErinnern("vorlage")
 	}()
+}
+
+// Teams-Status zur Auswahl: Bezeichnung → Schlüssel im Intranet (Statusvorlage::STATUS).
+var vorlagenStatus = []struct{ Name, Wert string }{
+	{"Nicht stören", "DoNotDisturb"},
+	{"Beschäftigt", "Busy"},
+	{"Abwesend", "Away"},
+	{"Bin gleich zurück", "BeRightBack"},
+	{"Offline", "Offline"},
+}
+
+// Neue Statusvorlage Schritt für Schritt: Name, Dauer, Teams-Status, Text, Rückkehr, Pause.
+// „Abbrechen“ in den ersten Schritten bricht ab, ohne etwas zu speichern.
+func (a *App) vorlageAnlegen() {
+	if a.dialog.Load() {
+		return
+	}
+	a.dialog.Store(true)
+	defer a.dialog.Store(false)
+	opts := func(ok string, mehr ...zenity.Option) []zenity.Option {
+		return append([]zenity.Option{zenity.Title(titel + " – Neue Statusvorlage"), fensterSymbol(), zenity.OKLabel(ok), zenity.CancelLabel("Abbrechen")}, mehr...)
+	}
+
+	name, err := zenity.Entry("Name der Vorlage (z. B. Telefonat):", opts("Weiter")...)
+	name = strings.TrimSpace(name)
+	if err != nil || name == "" {
+		return
+	}
+
+	dauern := []string{dauerText(5)}
+	for m := 15; m <= 300; m += 15 {
+		dauern = append(dauern, dauerText(m))
+	}
+	wahl, err := zenity.List("Wie lange?", dauern, opts("Weiter", zenity.DefaultItems(dauerText(30)))...)
+	if err != nil || wahl == "" {
+		return
+	}
+	minuten := 5
+	for m := 15; m <= 300; m += 15 {
+		if dauerText(m) == wahl {
+			minuten = m
+		}
+	}
+
+	namen := []string{}
+	for _, st := range vorlagenStatus {
+		namen = append(namen, st.Name)
+	}
+	wahl, err = zenity.List("Teams-Status:", namen, opts("Weiter", zenity.DefaultItems(namen[0]))...)
+	if err != nil || wahl == "" {
+		return
+	}
+	status := ""
+	for _, st := range vorlagenStatus {
+		if st.Name == wahl {
+			status = st.Wert
+		}
+	}
+
+	text, err := zenity.Entry("Statustext für Teams (leer = keiner):", opts("Weiter")...)
+	if err != nil {
+		return
+	}
+
+	rueckkehr := "frage"
+	err = zenity.Question("Nach "+dauerText(minuten)+" Teams wieder auf „Verfügbar“ stellen:",
+		zenity.Title(titel+" – Neue Statusvorlage"), fensterSymbol(), zenity.OKLabel("Nach Rückfrage"), zenity.CancelLabel("Automatisch"))
+	if err != nil {
+		rueckkehr = "automatisch"
+	}
+
+	pause := "0"
+	if zenity.Question("Zugleich eine Pause buchen?", zenity.Title(titel+" – Neue Statusvorlage"), fensterSymbol(),
+		zenity.OKLabel("Ja, Pause buchen"), zenity.CancelLabel("Nein")) == nil {
+		pause = "1"
+	}
+
+	i := a.verbindung()
+	if i == nil {
+		return
+	}
+	var antw antwort
+	err = i.anfrage("POST", "vorlage-anlegen", url.Values{
+		"name": {name}, "minuten": {strconv.Itoa(minuten)}, "verfuegbarkeit": {status},
+		"text": {strings.TrimSpace(text)}, "rueckkehr": {rueckkehr}, "pause": {pause},
+	}, &antw)
+	a.dialog.Store(false)
+	a.ergebnis(antw.Meldung, err)
+	if err == nil {
+		protokoll("Statusvorlage angelegt: " + name)
+	}
+	a.aktualisieren()
 }

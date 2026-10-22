@@ -26,7 +26,8 @@ sonst Tagessoll, sonst Ende der Kernzeit) und die Höchstarbeitszeit – gebucht
   Programm die Pause an der Grenze selbst ein (offene Pausenfenster schließen sich). Beendet wird sie nur per Klick.
 - **Statusvorlagen:** Rechtsklick → „Statusvorlagen“ zeigt die eigenen Vorlagen aus dem Intranet (Meine Zeiten → Teams):
   Teams-Status + Text für 5 Min. oder 15–300 Min., danach automatisch zurück oder nach Rückfrage; optional zugleich Pause buchen.
-  „Teams wieder auf Verfügbar“ beendet eine Vorlage vorzeitig.
+  „Teams wieder auf Verfügbar“ beendet eine Vorlage vorzeitig. „Neue Statusvorlage …“ legt eine Vorlage in sechs
+  kleinen Fenstern an (Name, Dauer, Teams-Status, Text, Rückkehr, Pause) und speichert sie im Intranet.
   Bei abgelaufener Vorlage bzw. Pause: „Erneut erinnern …“ in 5/10/15/20/30/45/60 Min.
 - **Höchstarbeitszeit (10 Std.):** Fenster „Feierabend (Gehen buchen)“ oder „Pause vergessen“ – dann Dauer (15–300 Min.)
   und Beginn wählen, die Pause wird nachgetragen und es geht weiter.
