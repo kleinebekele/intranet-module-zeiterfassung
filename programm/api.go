@@ -144,16 +144,29 @@ func (i *Intranet) PauseNachtragen(von, bis time.Time, notiz ...string) (string,
 }
 
 func (i *Intranet) GehenNachtragen(zeit time.Time, lautGeraet bool) (string, error) {
+	meldung, _, err := i.gehenNachtragen(zeit, lautGeraet)
+	return meldung, err
+}
+
+// Wie GehenNachtragen, liefert zusätzlich die Arbeitsminuten jenes Tages (-1 = unbekannt, ältere Intranets).
+func (i *Intranet) gehenNachtragen(zeit time.Time, lautGeraet bool) (string, int, error) {
 	laut := "0"
 	if lautGeraet {
 		laut = "1"
 	}
-	var a antwort
+	a := struct {
+		antwort
+		TagMinuten *int `json:"tag_minuten"`
+	}{}
 	err := i.anfrage("POST", "gehen-nachtragen", url.Values{
 		"zeit":        {zeit.Format(time.RFC3339)},
 		"laut_geraet": {laut},
 	}, &a)
-	return a.Meldung, err
+	minuten := -1
+	if a.TagMinuten != nil {
+		minuten = *a.TagMinuten
+	}
+	return a.Meldung, minuten, err
 }
 
 // Verbindung pruefen: Fehler 401/403 sind Klartext vom Intranet.

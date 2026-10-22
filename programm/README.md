@@ -13,6 +13,8 @@ sonst Tagessoll, sonst Ende der Kernzeit) und die Höchstarbeitszeit – gebucht
   „Arbeitsende um …?“. War der Rechner aus bzw. neu gestartet (Windows-Updates), bleibt es bis 30 Min. Arbeitszeit.
   Bleibt die Abwesenheit Arbeitszeit, obwohl inzwischen eine Pause Pflicht war, fragt das Programm nach deren
   Beginn und trägt die fehlende Mindestpause ein (ohne Angabe ab Beginn der Abwesenheit).
+  Rechner über Nacht aus, ohne zu gehen: Am nächsten Morgen wird „Gehen“ zum Zeitpunkt des Ausschaltens eingetragen
+  und das Programm meldet Uhrzeit und Tagessumme.
   Solange gesperrt, keine Erinnerungen. „Beenden“ über das Menü fragt nach „Gehen“.
 - **Startfrage:** „Ja, Kommen …“ fragt nach dem Beginn – jetzt oder vor 1–15 Minuten (nie vor das letzte Gehen).
 - **Pause:** Fenster mit 15/30/45/60 Min. und – bei gekoppeltem Teams – Statusnachricht. Nach der gewählten Dauer

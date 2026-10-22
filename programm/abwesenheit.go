@@ -113,6 +113,10 @@ func (a *App) abwesenheitKlaeren(von, bis time.Time, grund string, abPause time.
 	if beginn, err := time.Parse(time.RFC3339, s.OffenBeginn); err == nil && !von.After(beginn) {
 		return // eingestempelt erst nach Beginn der Abwesenheit – nichts zu klären
 	}
+	if dauerAbwesend >= abwesendAbEnde && von.Format("2006-01-02") != bis.Format("2006-01-02") {
+		a.endeAutomatisch(von)
+		return
+	}
 	if dauerAbwesend >= abwesendAbEnde {
 		a.endeVorschlagen(von, grund)
 		return
@@ -211,4 +215,35 @@ func fehlendePause(s *Status, heute, block int) int {
 		fehlt = max(fehlt, 15)
 	}
 	return fehlt
+}
+
+// Rechner am Vortag ausgeschaltet, ohne zu gehen: Das Arbeitsende ist der Zeitpunkt des
+// Ausschaltens (laut Lebenszeichen) – eintragen und Bescheid geben, dann die Startfrage.
+func (a *App) endeAutomatisch(ende time.Time) {
+	i := a.verbindung()
+	if i == nil {
+		return
+	}
+	meldung, minuten, err := i.gehenNachtragen(ende, true)
+	if err != nil {
+		a.ergebnis(meldung, err)
+		return
+	}
+	protokoll("Arbeitsende automatisch: " + ende.Format("02.01. 15:04"))
+	gesamt := ""
+	if minuten >= 0 {
+		gesamt = " nach insgesamt " + dauer(minuten) + " Std. Arbeitszeit"
+	}
+	tag := "gestern"
+	if ende.Format("2006-01-02") != time.Now().AddDate(0, 0, -1).Format("2006-01-02") {
+		tag = "am " + ende.Format("02.01.")
+	}
+	a.hinweis("Deine Arbeitszeit wurde " + tag + " mit dem Herunterfahren um " + ende.Format("15:04") + " Uhr" + gesamt + " automatisch beendet.\n\nStimmt das nicht, korrigiere es unter „Meine Zeiten“ im Intranet.")
+	a.aktualisieren()
+	if s := a.aktuell(); s != nil && s.Zustand == "weg" {
+		a.merkerMu.Lock()
+		delete(a.erledigt, "start")
+		a.merkerMu.Unlock()
+		a.frageStart()
+	}
 }

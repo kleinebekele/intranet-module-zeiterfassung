@@ -240,6 +240,10 @@ class AppController
         }
         TeamsStatus::nachBuchung($user, 'gehen');
 
-        return response()->json(['ok' => true, 'meldung' => 'Gehen um '.$ende->format('H:i').' Uhr eingetragen.']);
+        // Arbeitszeit des Tages, an dem der Abschnitt endete (für die Info am nächsten Morgen).
+        $tagMinuten = Buchung::gueltig()->where('user_id', $user->id)->zwischen($ende, $ende)->get()
+            ->sum(fn (Buchung $b) => $b->minuten($ende));
+
+        return response()->json(['ok' => true, 'meldung' => 'Gehen um '.$ende->format('H:i').' Uhr eingetragen.', 'tag_minuten' => $tagMinuten]);
     }
 }
