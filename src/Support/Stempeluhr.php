@@ -67,10 +67,11 @@ class Stempeluhr
      */
     /**
      * @param  array{nachricht?: string, ohne?: bool}  $teams  Teams-Statusnachricht zur Pause; ohne = Teams nicht anfassen (Statusvorlage setzt selbst)
+     * @param  int  $vor  Kommen rückdatieren um 0–15 Minuten (PC-Programm: „angefangen vor …"), nie vor das letzte Ende
      */
-    public static function buchen(User $user, string $aktion, string $quelle, ?int $terminalId = null, array $teams = []): Buchung
+    public static function buchen(User $user, string $aktion, string $quelle, ?int $terminalId = null, array $teams = [], int $vor = 0): Buchung
     {
-        $buchung = DB::transaction(function () use ($user, $aktion, $quelle, $terminalId) {
+        $buchung = DB::transaction(function () use ($user, $aktion, $quelle, $terminalId, $vor) {
             // Sperre gegen Doppelklick: zwei Anfragen gleichzeitig dürfen nicht zwei Abschnitte öffnen.
             User::whereKey($user->id)->lockForUpdate()->first();
 
@@ -86,9 +87,18 @@ class Stempeluhr
             }
 
             if ($aktion === 'kommen' || $aktion === 'weiter') {
+                $beginn = $jetzt;
+                if ($aktion === 'kommen' && $vor > 0) {
+                    $beginn = $jetzt->copy()->subMinutes(min($vor, 15));
+                    $letztesEnde = Buchung::gueltig()->where('user_id', $user->id)->whereNotNull('ende')->max('ende');
+                    if ($letztesEnde && $beginn->lt($letztesEnde)) {
+                        $beginn = Carbon::parse($letztesEnde);
+                    }
+                }
+
                 return Buchung::create([
                     'user_id' => $user->id,
-                    'beginn' => $jetzt,
+                    'beginn' => $beginn,
                     'quelle' => $quelle,
                     'status' => Buchung::GUELTIG,
                     'terminal_id' => $terminalId,

@@ -193,12 +193,15 @@ class AppController
         $teams = $aktion === 'pause' ? array_filter(['nachricht' => mb_substr(trim((string) $request->input('nachricht')), 0, 280)]) : [];
 
         try {
-            Stempeluhr::buchen($request->user(), $aktion, 'app', null, $teams);
+            // Kommen auf Wunsch 1–15 Minuten früher (Rechner nicht als Erstes eingeschaltet).
+            $vor = $aktion === 'kommen' ? max(0, min(15, (int) $request->input('vor'))) : 0;
+            $buchung = Stempeluhr::buchen($request->user(), $aktion, 'app', null, $teams, $vor);
         } catch (RuntimeException $e) {
             return response()->json(['ok' => false, 'meldung' => $e->getMessage()], 409);
         }
+        $zeit = $aktion === 'kommen' ? $buchung->beginn : now();
 
-        return response()->json(['ok' => true, 'meldung' => Stempeluhr::AKTIONEN[$aktion].' gebucht: '.now()->format('H:i').' Uhr.']);
+        return response()->json(['ok' => true, 'meldung' => Stempeluhr::AKTIONEN[$aktion].' gebucht: '.$zeit->format('H:i').' Uhr.']);
     }
 
     /**

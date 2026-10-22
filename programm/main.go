@@ -10,6 +10,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"slices"
 	"strconv"
@@ -310,9 +311,9 @@ func (a *App) startfragen(beat time.Time, beatOk bool) {
 	beginn, _ := time.Parse(time.RFC3339, s.OffenBeginn)
 
 	switch {
-	case s.Zustand == "da" && beatOk && time.Since(beat) >= abwesendAbPause && beat.After(beginn):
-		// Ab 15 Min. Pause anbieten, ab 2 Std. Arbeitsende vorschlagen.
-		a.abwesenheitKlaeren(beat, time.Now(), "Der Rechner war aus")
+	case s.Zustand == "da" && beatOk && time.Since(beat) >= neustartAbPause && beat.After(beginn):
+		// Aus bzw. Neustart: bis 30 Min. bleibt es Arbeitszeit, danach Pause anbieten, ab 2 Std. Arbeitsende.
+		a.abwesenheitKlaeren(beat, time.Now(), "Der Rechner war aus oder wurde neu gestartet", neustartAbPause)
 	case s.Zustand == "da" && s.OffenSeitVortag:
 		if a.frage(fmt.Sprintf("Du bist seit %s eingestempelt – vermutlich vergessen auszustempeln.\n\nIm Intranet unter „Meine Zeiten“ korrigieren?", beginn.Local().Format("02.01. 15:04")), "Intranet öffnen", "Später", "") == antwortJa {
 			if i := a.verbindung(); i != nil {
@@ -345,9 +346,9 @@ func (a *App) takt(t time.Time) {
 			a.merkeAbwesend(vorher)
 		} else if seit, ok := a.abwesendSeit(); ok {
 			a.vergissAbwesend()
-			go a.abwesenheitKlaeren(seit, t, "Der Rechner war gesperrt bzw. im Ruhezustand")
+			go a.abwesenheitKlaeren(seit, t, "Der Rechner war gesperrt bzw. im Ruhezustand", abwesendAbPause)
 		} else {
-			go a.abwesenheitKlaeren(vorher, t, "Der Rechner war im Ruhezustand")
+			go a.abwesenheitKlaeren(vorher, t, "Der Rechner war im Ruhezustand", abwesendAbPause)
 		}
 		return
 	}
@@ -473,11 +474,17 @@ func (a *App) frageStart() {
 	if s := a.aktuell(); s != nil {
 		vorname = strings.Fields(s.Person + " ")[0]
 	}
-	switch a.frage("Hallo "+vorname+"!\n\nArbeitszeit jetzt starten?", "Ja, Kommen", "Später", "Heute nicht") {
+	switch a.frage("Hallo "+vorname+"!\n\nArbeitszeit starten?", "Ja, Kommen …", "Später", "Heute nicht") {
 	case antwortJa:
+		vor, ok := a.beginnWaehlen()
+		if !ok {
+			a.startOffen.Store(true)
+			a.ruhe("start", 15*time.Minute)
+			return
+		}
 		a.startOffen.Store(false)
 		a.erledige("start")
-		a.stempeln("kommen")
+		a.stempeln("kommen", url.Values{"vor": {strconv.Itoa(vor)}})
 	case antwortExtra:
 		a.startOffen.Store(false)
 		a.erledige("start")
@@ -485,6 +492,33 @@ func (a *App) frageStart() {
 		a.startOffen.Store(true)
 		a.ruhe("start", 15*time.Minute)
 	}
+}
+
+// Beginn wählen: jetzt oder vor 1–15 Minuten (Rechner nicht als Erstes eingeschaltet).
+// ok = false bei „Abbrechen".
+func (a *App) beginnWaehlen() (vor int, ok bool) {
+	jetzt := time.Now()
+	punkte := []string{"Jetzt (" + jetzt.Format("15:04") + " Uhr)"}
+	for m := 1; m <= 15; m++ {
+		einheit := "Minuten"
+		if m == 1 {
+			einheit = "Minute"
+		}
+		punkte = append(punkte, fmt.Sprintf("Vor %d %s (%s Uhr)", m, einheit, jetzt.Add(-time.Duration(m)*time.Minute).Format("15:04")))
+	}
+	a.dialog.Store(true)
+	wahl, err := zenity.List("Wann hast du angefangen?", punkte, zenity.Title(titel), fensterSymbol(),
+		zenity.DefaultItems(punkte[0]), zenity.OKLabel("Kommen"), zenity.CancelLabel("Abbrechen"))
+	a.dialog.Store(false)
+	if err != nil {
+		return 0, false
+	}
+	for n, p := range punkte {
+		if p == wahl {
+			return n, true
+		}
+	}
+	return 0, true
 }
 
 // Erinnerung mit „Später": Ja bucht die Aktion, Später ruht für die angegebene Zeit.
@@ -587,12 +621,12 @@ func (a *App) beenden() {
 
 // ── Buchen und Status ──────────────────────────────────────────────
 
-func (a *App) stempeln(aktion string) {
+func (a *App) stempeln(aktion string, extra ...url.Values) {
 	i := a.verbindung()
 	if i == nil {
 		return
 	}
-	meldung, err := i.Stempeln(aktion)
+	meldung, err := i.Stempeln(aktion, extra...)
 	a.ergebnis(meldung, err)
 	if err == nil {
 		protokoll("Gebucht: " + aktion)

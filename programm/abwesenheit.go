@@ -18,6 +18,8 @@ import (
 const (
 	abwesendAbPause = 15 * time.Minute
 	abwesendAbEnde  = 2 * time.Hour
+	// Rechner aus bzw. neu gestartet (z. B. Windows-Updates): bis 30 Min. bleibt es Arbeitszeit.
+	neustartAbPause = 30 * time.Minute
 )
 
 var (
@@ -85,15 +87,15 @@ func (a *App) sperreBeobachten() {
 		case !zu && abwesend:
 			seit, _ := a.abwesendSeit()
 			a.vergissAbwesend()
-			go a.abwesenheitKlaeren(seit, time.Now(), "Der Rechner war gesperrt")
+			go a.abwesenheitKlaeren(seit, time.Now(), "Der Rechner war gesperrt", abwesendAbPause)
 		}
 	}
 }
 
 // Zurück am Rechner: je nach Dauer nichts tun, Pause anbieten oder Arbeitsende vorschlagen.
-func (a *App) abwesenheitKlaeren(von, bis time.Time, grund string) {
+func (a *App) abwesenheitKlaeren(von, bis time.Time, grund string, abPause time.Duration) {
 	dauerAbwesend := bis.Sub(von)
-	if dauerAbwesend < abwesendAbPause {
+	if dauerAbwesend < abPause {
 		return
 	}
 	a.aktualisieren()

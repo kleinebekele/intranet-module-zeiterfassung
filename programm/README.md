@@ -10,7 +10,9 @@ sonst Tagessoll, sonst Ende der Kernzeit) und die Höchstarbeitszeit – gebucht
 - **Weg vom Rechner** (gesperrt, Ruhezustand, abgemeldet, aus): Das Programm merkt sich nur den Beginn (lokal,
   `lebenszeichen.txt` jede Minute, `abwesend-seit.txt` beim Sperren) und bucht nichts. Beim Zurückkommen:
   unter 15 Min. nichts (bleibt Arbeitszeit), ab 15 Min. „War das eine Pause?“ (Ja → Pause rückwirkend), ab 2 Std.
-  „Arbeitsende um …?“. Solange gesperrt, keine Erinnerungen. „Beenden“ über das Menü fragt nach „Gehen“.
+  „Arbeitsende um …?“. War der Rechner aus bzw. neu gestartet (Windows-Updates), bleibt es bis 30 Min. Arbeitszeit.
+  Solange gesperrt, keine Erinnerungen. „Beenden“ über das Menü fragt nach „Gehen“.
+- **Startfrage:** „Ja, Kommen …“ fragt nach dem Beginn – jetzt oder vor 1–15 Minuten (nie vor das letzte Gehen).
 - **Pause:** Fenster mit 15/30/45/60 Min. und – bei gekoppeltem Teams – Statusnachricht. Nach der gewählten Dauer
   fragt das Programm nur „Pause beenden?“; ohne Antwort bleibt es Pause (nichts wird automatisch gebucht).
 - **Tagesübersicht** (Mouseover am Uhr-Symbol und vollständig im Rechtsklick-Menü): heutige Abschnitte mit Dauer,
