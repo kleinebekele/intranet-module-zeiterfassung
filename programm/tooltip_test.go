@@ -25,9 +25,9 @@ func TestTagesZeilen(t *testing.T) {
 			t.Errorf("fehlt: %s", soll)
 		}
 	}
-	tip := a.tooltipText(kopf, abschnitte, fuss)
+	tip := a.tooltipText(s, jetzt)
 	t.Log("\n" + tip)
-	if n := len(utf16.Encode([]rune(tip))); n > tooltipMax || !strings.Contains(tip, "14:53–jetzt") {
+	if n := len(utf16.Encode([]rune(tip))); n > tooltipMax || tip != "Heute 6:26 Std.\nPause fällig 17:49\nFeierabend 16:49" {
 		t.Fatalf("Mouseover falsch (%d Zeichen)", n)
 	}
 }

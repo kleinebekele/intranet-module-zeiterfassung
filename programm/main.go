@@ -740,8 +740,8 @@ func (a *App) menueSetzen() {
 	text := map[string]string{"da": "Da" + seit, "pause": "Pause" + seit, "weg": "Nicht eingestempelt"}[s.Zustand]
 	text += " · heute " + dauer(s.HeuteMinuten) + " Std."
 	a.mStatus.SetTitle(text)
-	kopf, abschnitte, fuss := a.tagesZeilen(s, time.Now())
-	systray.SetTooltip(a.tooltipText(kopf, abschnitte, fuss))
+	_, abschnitte, fuss := a.tagesZeilen(s, time.Now())
+	systray.SetTooltip(a.tooltipText(s, time.Now()))
 	a.tagesMenueSetzen(append(abschnitte, fuss...))
 	switch s.Zustand {
 	case "da":

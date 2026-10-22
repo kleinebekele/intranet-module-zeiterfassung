@@ -4,16 +4,14 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unicode/utf16"
 
 	"fyne.io/systray"
 )
 
 // Tagesübersicht: Stunden bisher, heutige Abschnitte untereinander (mit Dauer) und die Pausen
-// dazwischen, nächste fällige Pause und Feierabend. Steht im Mouseover am Uhr-Symbol und
-// vollständig im Rechtsklick-Menü – Windows zeigt im Mouseover höchstens 127 Zeichen, dort
-// fallen deshalb die ältesten Abschnitte weg („…").
-const tooltipMax = 127
+// dazwischen, nächste fällige Pause und Feierabend – vollständig im Rechtsklick-Menü,
+// gekürzt im Mouseover am Uhr-Symbol.
+const tooltipMax = 63
 
 const tagesPlaetze = 24 // Menüzeilen auf Vorrat (systray kann Punkte nur verstecken)
 
@@ -78,19 +76,17 @@ func (a *App) tagesZeilen(s *Status, jetzt time.Time) (kopf string, abschnitte, 
 	return kopf, abschnitte, fuss
 }
 
-func (a *App) tooltipText(kopf string, abschnitte, fuss []string) string {
-	for weg := 0; ; weg++ {
-		zeilen := []string{kopf}
-		if weg > 0 {
-			zeilen = append(zeilen, "…")
-		}
-		zeilen = append(zeilen, abschnitte[min(weg, len(abschnitte)):]...)
-		zeilen = append(zeilen, fuss...)
-		text := strings.Join(zeilen, "\n")
-		if len(utf16.Encode([]rune(text))) <= tooltipMax || weg >= len(abschnitte) {
-			return kuerze(text, tooltipMax)
-		}
+// Mouseover: Windows zeigt dort nur 63 Zeichen. Deshalb nur Summe, nächste Pause und
+// Feierabend; die Abschnitte stehen vollständig im Rechtsklick-Menü.
+func (a *App) tooltipText(s *Status, jetzt time.Time) string {
+	zeilen := []string{"Heute " + dauer(a.heuteBisher(s, jetzt)) + " Std."}
+	if p := a.naechstePause(s, jetzt); p != "" {
+		zeilen = append(zeilen, "Pause fällig "+strings.TrimSuffix(p, " Uhr"))
 	}
+	if f := a.feierabend(s, jetzt); f != "" {
+		zeilen = append(zeilen, "Feierabend "+strings.TrimSuffix(f, " Uhr"))
+	}
+	return kuerze(strings.Join(zeilen, "\n"), tooltipMax)
 }
 
 // „22 Min." bzw. „4:07 Std."
