@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ncruces/zenity"
 	"golang.org/x/sys/windows"
 )
 
@@ -121,6 +122,7 @@ func (a *App) abwesenheitKlaeren(von, bis time.Time, grund string, abPause time.
 		grund, von.Format("15:04"), bis.Format("15:04"), dauer(int(dauerAbwesend.Minutes())))
 	if a.frage(text, "Ja, als Pause eintragen", "Nein, das war Arbeitszeit", "") != antwortJa {
 		protokoll("Abwesenheit " + von.Format("15:04") + "–" + bis.Format("15:04") + " bleibt Arbeitszeit")
+		a.pflichtpauseNachtragen(von, bis)
 		return
 	}
 	if i := a.verbindung(); i != nil {
@@ -128,4 +130,85 @@ func (a *App) abwesenheitKlaeren(von, bis time.Time, grund string, abPause time.
 		a.ergebnis(meldung, err)
 	}
 	a.aktualisieren()
+}
+
+// Die Abwesenheit bleibt Arbeitszeit, aber inzwischen war eine Pause Pflicht (§ 4 ArbZG):
+// darauf hinweisen und den Beginn der Pause erfragen. Ohne Angabe beginnt sie mit der
+// Abwesenheit (Rechner aus bzw. gesperrt). Die Dauer ist die fehlende Mindestpause.
+func (a *App) pflichtpauseNachtragen(von, bis time.Time) {
+	a.aktualisieren()
+	s := a.aktuell()
+	if s == nil || s.Zustand != "da" {
+		return
+	}
+	minuten := fehlendePause(s, a.heuteBisher(s, time.Now()), s.BlockMinuten+int(time.Since(a.geholtAm).Minutes()))
+	if minuten == 0 {
+		return
+	}
+
+	a.dialog.Store(true)
+	_ = zenity.Info(fmt.Sprintf("Bis jetzt war eine Pause von mindestens %d Minuten Pflicht (§ 4 ArbZG).\n\n"+
+		"Gib im nächsten Fenster an, wann du sie gemacht hast.\nOhne Angabe beginnt sie um %s Uhr (Rechner weg).",
+		minuten, von.Format("15:04")), zenity.Title(titel), fensterSymbol(), zenity.OKLabel("Weiter"))
+	a.dialog.Store(false)
+
+	for {
+		beginn := von
+		a.dialog.Store(true)
+		eingabe, err := zenity.Entry("Beginn der Pause (HH:MM):", zenity.Title(titel), fensterSymbol(),
+			zenity.EntryText(von.Format("15:04")), zenity.OKLabel("Pause eintragen"), zenity.CancelLabel("Abbrechen"))
+		a.dialog.Store(false)
+		if err == nil {
+			t, ok := heuteUm(strings.TrimSpace(eingabe))
+			if !ok {
+				a.fehler("Bitte die Uhrzeit als HH:MM angeben, z. B. " + von.Format("15:04"))
+				continue
+			}
+			beginn = t
+		}
+		ende := beginn.Add(time.Duration(minuten) * time.Minute)
+		if ende.After(time.Now()) {
+			if err == nil {
+				a.fehler("Die Pause würde in der Zukunft enden – bitte einen früheren Beginn angeben.")
+				continue
+			}
+			ende = time.Now() // Abbrechen bei kurzer Abwesenheit: Pause bis jetzt
+		}
+		i := a.verbindung()
+		if i == nil {
+			return
+		}
+		meldung, ferr := i.PauseNachtragen(beginn, ende, "Pflichtpause während der Abwesenheit vom Rechner – im PC-Programm nachgetragen")
+		if ferr != nil {
+			a.fehler(ferr.Error())
+			if err != nil {
+				return // schon „Abbrechen“ gewählt: nicht endlos fragen
+			}
+			continue
+		}
+		a.ergebnis(meldung, nil)
+		protokoll(fmt.Sprintf("Pflichtpause nachgetragen: %s–%s", beginn.Format("15:04"), ende.Format("15:04")))
+		a.aktualisieren()
+		return
+	}
+}
+
+// Fehlende Mindestpause in Minuten (0 = alles in Ordnung): 15 Min. nach 6 Std. am Stück,
+// insgesamt 30 Min. ab 6 Std. und 45 Min. ab 9 Std. Arbeit; jede Pause mindestens 15 Min.
+func fehlendePause(s *Status, heute, block int) int {
+	pause := ruhepausen(s)
+	fehlt := 0
+	if s.Regeln.MaxBlock > 0 && block > s.Regeln.MaxBlock {
+		fehlt = 15
+	}
+	if heute > 360 && pause < 30 {
+		fehlt = max(fehlt, 30-pause)
+	}
+	if heute > 540 && pause < 45 {
+		fehlt = max(fehlt, 45-pause)
+	}
+	if fehlt > 0 {
+		fehlt = max(fehlt, 15)
+	}
+	return fehlt
 }

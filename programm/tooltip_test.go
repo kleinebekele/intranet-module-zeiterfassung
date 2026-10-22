@@ -31,3 +31,19 @@ func TestTagesZeilen(t *testing.T) {
 		t.Fatalf("Mouseover falsch (%d Zeichen)", n)
 	}
 }
+
+func TestFehlendePause(t *testing.T) {
+	s := &Status{Abschnitte: []Zeitraum{{"08:00", "11:00"}, {"11:30", ""}}}
+	s.Regeln.MaxBlock = 360
+	if m := fehlendePause(s, 400, 200); m != 0 {
+		t.Errorf("30 Min. Pause bei 6:40 Std. reicht, aber %d", m)
+	}
+	if m := fehlendePause(s, 560, 260); m != 15 {
+		t.Errorf("ab 9 Std. fehlen 15 Min., aber %d", m)
+	}
+	ohne := &Status{Abschnitte: []Zeitraum{{"08:00", ""}}}
+	ohne.Regeln.MaxBlock = 360
+	if m := fehlendePause(ohne, 370, 370); m != 30 {
+		t.Errorf("6:10 Std. ohne Pause: 30 Min., aber %d", m)
+	}
+}
