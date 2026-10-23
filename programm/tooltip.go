@@ -157,20 +157,44 @@ func (a *App) naechstePause(s *Status, jetzt time.Time) string {
 	return jetzt.Add(time.Duration(rest)*time.Minute).Format("15:04") + " Uhr"
 }
 
-// Schichtende laut Dienstplan, sonst Tagessoll erreicht, sonst Ende der Kernzeit.
+// Frühester Feierabend: Schichtende laut Dienstplan, sonst Tagessoll erreicht – samt den
+// Pflichtpausen, die bis dahin noch anfallen –, sonst Ende der Kernzeit.
 func (a *App) feierabend(s *Status, jetzt time.Time) string {
 	heute := a.heuteBisher(s, jetzt)
 	switch {
 	case s.Schicht != nil:
-		return s.Schicht.Bis + " Uhr"
+		return "ab " + s.Schicht.Bis + " Uhr"
 	case s.SollHeute > 0 && heute >= s.SollHeute:
 		return "– Soll erreicht"
 	case s.SollHeute > 0 && s.Zustand == "da":
-		return jetzt.Add(time.Duration(s.SollHeute-heute)*time.Minute).Format("15:04") + " Uhr"
+		rest := s.SollHeute - heute
+		block := s.BlockMinuten + int(jetzt.Sub(a.geholtAm).Minutes())
+		return "ab " + jetzt.Add(time.Duration(rest+nochPflichtpause(s, rest, block))*time.Minute).Format("15:04") + " Uhr"
 	case s.SollHeute > 0:
-		return "in " + dauer(s.SollHeute-heute) + " Std."
+		return "in " + dauer(s.SollHeute-heute) + " Std. Arbeit"
 	case s.Kern != nil:
-		return s.Kern.Bis + " Uhr"
+		return "ab " + s.Kern.Bis + " Uhr"
 	}
 	return ""
+}
+
+// Pause in Minuten, die bis zum Erreichen des Solls noch Pflicht wird (§ 4 ArbZG): insgesamt
+// 30 Min. über 6 Std. und 45 Min. über 9 Std. Arbeit, jede Pause mindestens 15 Min., und
+// höchstens 6 Std. am Stück.
+func nochPflichtpause(s *Status, rest, block int) int {
+	noetig := 0
+	switch soll := s.SollHeute; {
+	case soll > 540:
+		noetig = 45
+	case soll > 360:
+		noetig = 30
+	}
+	fehlt := max(noetig-ruhepausen(s), 0)
+	if fehlt > 0 {
+		fehlt = max(fehlt, 15)
+	}
+	if s.Regeln.MaxBlock > 0 && rest > s.Regeln.MaxBlock-block {
+		fehlt = max(fehlt, 15)
+	}
+	return fehlt
 }
