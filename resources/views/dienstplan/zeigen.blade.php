@@ -57,6 +57,14 @@
                                 <button type="submit" class="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700">Veröffentlichen</button>
                             @endif
                         </form>
+                        @unless ($plan->istVeroeffentlicht())
+                            <form method="POST" action="{{ route('module.zeiterfassung.dienstplan.entwurf.entfernen', [$abteilung] + $mq) }}"
+                                  data-bestaetigen="Der Entwurf für diesen Monat wird mit allen Schichten gelöscht – auch von Hand eingetragenen."
+                                  data-titel="Entwurf entfernen?" data-knopf="Entfernen">
+                                @csrf
+                                <button type="submit" class="rounded-lg border border-red-300 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50">Entwurf entfernen</button>
+                            </form>
+                        @endunless
                     @endif
                 @endif
             </div>

@@ -72,6 +72,7 @@ Route::middleware(['web', 'auth'])
         Route::post('dienstplan/{abteilung}/vorschlagen', [DienstplanController::class, 'vorschlagen'])->name('dienstplan.vorschlagen');
         Route::post('dienstplan/{abteilung}/schicht', [DienstplanController::class, 'schicht'])->name('dienstplan.schicht');
         Route::post('dienstplan/{abteilung}/status', [DienstplanController::class, 'status'])->name('dienstplan.status');
+        Route::post('dienstplan/{abteilung}/entwurf-entfernen', [DienstplanController::class, 'entwurfEntfernen'])->name('dienstplan.entwurf.entfernen');
         Route::get('dienstplan/{abteilung}/abteilung', [AbteilungController::class, 'bearbeiten'])->name('dienstplan.abteilung');
         Route::post('dienstplan/{abteilung}/abteilung', [AbteilungController::class, 'speichern'])->name('dienstplan.abteilung.speichern');
         Route::post('dienstplan/{abteilung}/besetzung', [AbteilungController::class, 'besetzung'])->name('dienstplan.abteilung.besetzung');

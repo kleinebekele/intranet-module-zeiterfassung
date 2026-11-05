@@ -60,7 +60,7 @@ class ZeiterfassungServiceProvider extends ModuleServiceProvider
                 'team.verstoesse',
                 'freigaben.buchung', 'freigaben.abwesenheit',
                 // Dienstplan: Planen prüft Rechte::darfPlanen, Ansehen die Abteilungszugehörigkeit.
-                'dienstplan.zeigen', 'dienstplan.druck', 'dienstplan.vorschlagen', 'dienstplan.schicht', 'dienstplan.status',
+                'dienstplan.zeigen', 'dienstplan.druck', 'dienstplan.vorschlagen', 'dienstplan.schicht', 'dienstplan.status', 'dienstplan.entwurf.entfernen',
                 'dienstplan.abteilung', 'dienstplan.abteilung.anlegen', 'dienstplan.abteilung.speichern',
                 'dienstplan.abteilung.besetzung', 'dienstplan.abteilung.personen', 'dienstplan.abteilung.sondertag',
                 'dienstplan.abteilung.sondertag.entfernen', 'dienstplan.abteilung.entfernen',

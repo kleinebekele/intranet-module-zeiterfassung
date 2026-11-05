@@ -4,6 +4,7 @@ namespace Intranet\Modules\Zeiterfassung\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Intranet\Modules\Zeiterfassung\Models\Abteilung;
 use Intranet\Modules\Zeiterfassung\Models\Dienstplan;
 use Intranet\Modules\Zeiterfassung\Models\Schicht;
@@ -170,6 +171,27 @@ class DienstplanController
         Korrektur::audit('zeiterfassung.dienstplan', "Dienstplan {$abteilung->name} {$plan->monat->isoFormat('MMMM YYYY')} ".($veroeffentlichen ? 'veröffentlicht' : 'zurück auf Entwurf'), null);
 
         return back()->with('status', $veroeffentlichen ? 'Veröffentlicht – die Mitglieder sehen den Plan jetzt.' : 'Zurück auf Entwurf – für Mitglieder ausgeblendet.');
+    }
+
+    /** Entwurf samt Schichten entfernen – veröffentlichte Pläne erst zurück auf Entwurf setzen. */
+    public function entwurfEntfernen(Request $request, Abteilung $abteilung)
+    {
+        $this->darf($request);
+        $monat = $this->monat($request);
+        $plan = Dienstplan::fuer($abteilung, $monat);
+        abort_unless($plan, 404);
+        if ($plan->istVeroeffentlicht()) {
+            return back()->with('error', 'Der Plan ist veröffentlicht – erst „Zurück auf Entwurf“, dann entfernen.');
+        }
+
+        DB::transaction(function () use ($plan) {
+            $plan->schichten()->delete();
+            $plan->delete();
+        });
+        Korrektur::audit('zeiterfassung.dienstplan', "Dienstplan-Entwurf {$abteilung->name} {$monat->isoFormat('MMMM YYYY')} entfernt", null);
+
+        return redirect()->route('module.zeiterfassung.dienstplan.zeigen', [$abteilung, 'monat' => $monat->format('Y-m')])
+            ->with('status', 'Entwurf entfernt.');
     }
 
     public function druck(Request $request, Abteilung $abteilung)
