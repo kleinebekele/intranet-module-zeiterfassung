@@ -113,9 +113,11 @@
             {{-- Personen: Farbe, Monat geplant / Soll --}}
             <div class="flex flex-wrap gap-2 border-b border-gray-200 px-4 py-3">
                 @foreach ($personen as $uid => $p)
-                    @php $pr = $pruefung['personen'][$uid]; $diff = $pr['geplant'] - $pr['ziel']; @endphp
-                    <div class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs {{ $farbe[$uid] }} {{ $uid === $ich ? 'ring-2 ring-indigo-400' : '' }}"
-                         title="{{ $pr['gutschrift'] ? 'Feiertage gutgeschrieben: '.$dauer($pr['gutschrift']).' Std. – sie mindern das Soll.' : '' }}">
+                    @php $pr = $pruefung['personen'][$uid]; $diff = $pr['geplant'] - $pr['ziel']; $anzahlFrei = count($p['wunschfrei']); @endphp
+                    <{{ $planer ? 'button type=button' : 'div' }}
+                         @if ($planer) @click="personOeffne({{ $uid }}, @js($p['user']->name))" @endif
+                         class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs {{ $farbe[$uid] }} {{ $uid === $ich ? 'ring-2 ring-indigo-400' : '' }} {{ $planer ? 'hover:brightness-95' : '' }}"
+                         title="{{ $planer ? 'Anklicken: freie Tage ansehen und eintragen' : '' }}{{ $pr['gutschrift'] ? ($planer ? ' · ' : '').'Feiertage gutgeschrieben: '.$dauer($pr['gutschrift']).' Std. – sie mindern das Soll.' : '' }}">
                         <span class="font-semibold">{{ $p['user']->name }}</span>
                         @if ($p['aushilfe'])
                             <span>{{ $dauer($pr['geplant']) }}{{ $pr['budget'] !== null ? ' / max. '.$dauer($pr['budget']) : '' }} · Aushilfe</span>
@@ -126,7 +128,8 @@
                             @endif
                             @if ($pr['gutschrift'])<span class="opacity-70">Feiertag −{{ $dauer($pr['gutschrift']) }}</span>@endif
                         @endif
-                    </div>
+                        @if ($anzahlFrei)<span class="opacity-70">{{ $anzahlFrei }} {{ $anzahlFrei === 1 ? 'Tag' : 'Tage' }} frei</span>@endif
+                    </{{ $planer ? 'button' : 'div' }}>
                 @endforeach
             </div>
 
@@ -165,6 +168,7 @@
                                         $heute = $t['datum']->isToday();
                                         $hier = collect($personen)->map(fn ($p, $uid) => $schichten[$uid][$d] ?? null)->filter()->sortBy('von');
                                         $weg = collect($personen)->filter(fn ($p) => isset($p['abwesend'][$d]));
+                                        $freiHier = collect($personen)->filter(fn ($p) => isset($p['wunschfrei'][$d]));
                                         $fehlt = implode(' · ', array_merge(array_map(fn ($x) => 'Mindestens: '.$x, $pt['fehlt']), array_map(fn ($x) => 'Optional: '.$x, $pt['optional'])));
                                     @endphp
                                     <div class="flex min-w-0 flex-col rounded-md border p-1 min-[85rem]:min-h-28 {{ $t['offen'] ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50' }} {{ $heute ? 'ring-2 ring-indigo-400' : '' }}">
@@ -221,6 +225,14 @@
                                                     {{ $kurz($p['user']->name) }} {{ $p['abwesend'][$d] }}
                                                 </div>
                                             @endforeach
+                                            @foreach ($freiHier as $uid => $p)
+                                                <{{ $planer ? 'button type=button' : 'div' }}
+                                                     @if ($planer) @click="personOeffne({{ $uid }}, @js($p['user']->name))" @endif
+                                                     class="truncate rounded border border-dashed border-gray-300 px-1.5 py-0.5 text-left text-[11px] text-gray-500"
+                                                     title="{{ $p['user']->name }} hat frei{{ $p['wunschfrei'][$d] ? ': '.$p['wunschfrei'][$d] : '' }}">
+                                                    {{ $kurz($p['user']->name) }} frei
+                                                </{{ $planer ? 'button' : 'div' }}>
+                                            @endforeach
                                             @if ($planer)
                                                 <button type="button" @click="neu('{{ $d }}', @js($t['datum']->isoFormat('dd DD.MM.')), @js($t['datum']->isoFormat('dddd')))"
                                                         class="mt-auto self-start rounded px-1.5 text-sm leading-5 text-gray-400 hover:bg-gray-100 hover:text-indigo-600" title="Schicht eintragen">+</button>
@@ -262,7 +274,8 @@
                 <span><span class="inline-block rounded bg-red-500 px-1 font-bold text-white">!</span> unter Mindestbesetzung</span>
                 <span><i class="bx bx-time-five text-amber-600"></i> Überstunden (Mauszeiger drauf zeigt wie viele)</span>
                 <span>Summe = Plan / Soll der Woche, <span class="text-amber-700">über</span> bzw. <span class="text-red-600">unter</span> Soll eingefärbt (Feiertage und Abwesenheit gutgeschrieben)</span>
-                @if ($planer)<span>Schicht anklicken zum Ändern, + zum Eintragen</span>@endif
+                <span><span class="inline-block rounded border border-dashed border-gray-300 px-1">AB frei</span> freier Tag (wird nicht eingeplant)</span>
+                @if ($planer)<span>Schicht anklicken zum Ändern oder Freigeben, + zum Eintragen, Person oben anklicken für freie Tage</span>@endif
             </div>
         @endif
 
@@ -301,6 +314,11 @@
                             <span>Für alle <span x-text="wochentag"></span>e dieses Monats übernehmen</span>
                         </label>
                         <p class="text-xs text-gray-400">Pause leer = gesetzliche Pause automatisch. Geschlossene Tage und Abwesenheiten werden übersprungen.</p>
+                        <div x-show="user" class="flex flex-wrap items-center gap-2 rounded-lg bg-gray-50 px-3 py-2 text-sm">
+                            <span class="text-gray-600">Frei geben:</span>
+                            <button type="button" @click="freiGeben(false)" class="rounded-lg border border-gray-300 bg-white px-2.5 py-1 text-gray-700 hover:bg-gray-100">Diesen Tag frei</button>
+                            <button type="button" @click="freiGeben(true)" class="rounded-lg border border-gray-300 bg-white px-2.5 py-1 text-gray-700 hover:bg-gray-100">Diese Woche frei</button>
+                        </div>
                         <div class="flex items-center justify-between gap-2 pt-2">
                             <button type="button" x-show="vorhanden" @click="entfernen($el.form)"
                                     class="rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50">Entfernen</button>
@@ -310,6 +328,59 @@
                             </div>
                         </div>
                     </form>
+                </div>
+            </div>
+
+            {{-- Freie Tage setzen/entfernen (aus beiden Dialogen) --}}
+            <form x-ref="freiForm" method="POST" action="{{ route('module.zeiterfassung.dienstplan.frei', $abteilung) }}" class="hidden">
+                @csrf
+                <input type="hidden" name="user_id" :value="user">
+                <input type="hidden" name="von" :value="freiVon">
+                <input type="hidden" name="bis" :value="freiBis">
+                <input type="hidden" name="woche" :value="freiWoche ? 1 : 0">
+                <input type="hidden" name="notiz" :value="freiNotiz">
+                <input type="hidden" name="aktion" :value="freiAktion">
+            </form>
+
+            {{-- Dialog: freie Tage einer Person --}}
+            <div x-show="pOffen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @keydown.escape.window="pOffen = false">
+                <div class="w-full max-w-md rounded-xl bg-white p-5 shadow-xl" @click.outside="pOffen = false">
+                    <h3 class="text-base font-semibold text-gray-800">Freie Tage · <span x-text="name"></span></h3>
+                    <p class="mt-1 text-xs text-gray-500">An freien Tagen wird die Person in keiner Abteilung eingeplant. Das Wochensoll bleibt und verteilt sich auf die übrigen Tage.</p>
+
+                    <div class="mt-3">
+                        <div class="text-sm font-medium text-gray-700">{{ $monat->isoFormat('MMMM YYYY') }}</div>
+                        <template x-if="(frei[user] || []).length === 0">
+                            <p class="mt-1 text-sm text-gray-400">Keine freien Tage eingetragen.</p>
+                        </template>
+                        <ul class="mt-1 divide-y divide-gray-100">
+                            <template x-for="f in (frei[user] || [])" :key="f.datum">
+                                <li class="flex items-center gap-2 py-1.5 text-sm">
+                                    <span class="w-24 font-medium text-gray-800" x-text="f.tag"></span>
+                                    <span class="flex-1 truncate text-gray-500" x-text="f.notiz"></span>
+                                    <button type="button" @click="freiEntfernen(f.datum)" class="rounded px-2 py-0.5 text-xs text-red-600 hover:bg-red-50">entfernen</button>
+                                </li>
+                            </template>
+                        </ul>
+                    </div>
+
+                    <div class="mt-4 space-y-3 border-t border-gray-200 pt-4">
+                        <div class="text-sm font-medium text-gray-700">Freie Tage eintragen</div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <label class="block text-sm"><span class="text-gray-600">Von</span>
+                                <input type="date" x-model="freiVon" class="mt-1 w-full rounded-lg border-gray-300 text-sm"></label>
+                            <label class="block text-sm"><span class="text-gray-600">Bis (optional)</span>
+                                <input type="date" x-model="freiBis" :min="freiVon" class="mt-1 w-full rounded-lg border-gray-300 text-sm"></label>
+                        </div>
+                        <label class="block text-sm"><span class="text-gray-600">Notiz (optional)</span>
+                            <input type="text" x-model="freiNotiz" maxlength="200" placeholder="z. B. Arzttermin, Wunschfrei" class="mt-1 w-full rounded-lg border-gray-300 text-sm"></label>
+                        <p class="text-xs text-gray-400">Schichten dieser Abteilung an den Tagen werden dabei entfernt.</p>
+                        <div class="flex justify-end gap-2">
+                            <button type="button" @click="pOffen = false" class="rounded-lg px-3 py-2 text-sm text-gray-600 hover:bg-gray-100">Schließen</button>
+                            <button type="button" @click="freiEintragen()" :disabled="! freiVon"
+                                    class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50">Eintragen</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         @endif
@@ -339,11 +410,39 @@
         @endif
     @endif
 
+    @php
+        $freiListe = collect($personen ?? [])->map(fn ($p) => collect($p['wunschfrei'] ?? [])
+            ->sortKeys()
+            ->map(fn ($notiz, $datum) => ['datum' => $datum, 'tag' => \Illuminate\Support\Carbon::parse($datum)->isoFormat('dd DD.MM.'), 'notiz' => $notiz])
+            ->values())->all();
+    @endphp
     @once
         <script>
             document.addEventListener('alpine:init', () => {
                 Alpine.data('schichtDialog', () => ({
                     offen: false, vorhanden: false, alle: false, user: '', name: '', datum: '', tag: '', wochentag: '', von: '', bis: '', pause: '', notiz: '',
+                    pOffen: false, frei: @json($freiListe), freiVon: '', freiBis: '', freiWoche: false, freiNotiz: '', freiAktion: 'setzen',
+                    personOeffne(user, name) {
+                        Object.assign(this, { pOffen: true, offen: false, user: String(user), name, freiVon: '', freiBis: '', freiWoche: false, freiNotiz: '' });
+                    },
+                    async senden(werte) {
+                        Object.assign(this, werte);
+                        await this.$nextTick();
+                        this.$refs.freiForm.submit();
+                    },
+                    freiEintragen() {
+                        this.senden({ freiAktion: 'setzen', freiWoche: false });
+                    },
+                    freiEntfernen(datum) {
+                        this.senden({ freiAktion: 'entfernen', freiVon: datum, freiBis: datum, freiWoche: false });
+                    },
+                    async freiGeben(woche) {
+                        const person = this.name || (this.$root.querySelector('select[name=user_id] option:checked')?.textContent ?? '');
+                        if (window.bestaetige && ! await window.bestaetige(
+                            `${person.trim()} hat ${woche ? 'in dieser Woche (Mo–So)' : 'an diesem Tag'} frei. Schichten dieser Abteilung in dem Zeitraum werden entfernt.`,
+                            { titel: woche ? 'Woche frei?' : 'Tag frei?', knopf: 'Frei geben' })) return;
+                        this.senden({ freiAktion: 'setzen', freiVon: this.datum, freiBis: '', freiWoche: woche, freiNotiz: '' });
+                    },
                     oeffne(user, name, datum, tag, wochentag, von, bis, pause, notiz) {
                         Object.assign(this, { offen: true, alle: false, vorhanden: !! von, user, name, datum, tag, wochentag, von, bis, pause, notiz });
                     },

@@ -7,6 +7,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Intranet\Modules\Zeiterfassung\Models\Abteilung;
 use Intranet\Modules\Zeiterfassung\Models\Dienstplan;
+use Intranet\Modules\Zeiterfassung\Models\FreierTag;
 use Intranet\Modules\Zeiterfassung\Models\Schicht;
 use Intranet\Modules\Zeiterfassung\Support\Korrektur;
 use Intranet\Modules\Zeiterfassung\Support\Planer;
@@ -171,6 +172,57 @@ class DienstplanController
         Korrektur::audit('zeiterfassung.dienstplan', "Dienstplan {$abteilung->name} {$plan->monat->isoFormat('MMMM YYYY')} ".($veroeffentlichen ? 'veröffentlicht' : 'zurück auf Entwurf'), null);
 
         return back()->with('status', $veroeffentlichen ? 'Veröffentlicht – die Mitglieder sehen den Plan jetzt.' : 'Zurück auf Entwurf – für Mitglieder ausgeblendet.');
+    }
+
+    /**
+     * Freie Tage einer Person setzen oder entfernen: ein Zeitraum (von–bis), ein Tag oder die
+     * ganze Woche des Tages. Beim Setzen fallen Schichten dieser Abteilung an den Tagen weg.
+     */
+    public function frei(Request $request, Abteilung $abteilung)
+    {
+        $this->darf($request);
+        $data = $request->validate([
+            'user_id' => ['required', 'integer'],
+            'von' => ['required', 'date_format:Y-m-d'],
+            'bis' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:von'],
+            'woche' => ['nullable', 'boolean'],
+            'notiz' => ['nullable', 'string', 'max:200'],
+            'aktion' => ['required', 'in:setzen,entfernen'],
+        ]);
+        $person = $abteilung->personen()->where('users.id', $data['user_id'])->first();
+        abort_unless($person, 404);
+
+        $von = Carbon::parse($data['von'])->startOfDay();
+        $bis = Carbon::parse($data['bis'] ?? $data['von'])->startOfDay();
+        if ($request->boolean('woche')) {
+            [$von, $bis] = [$von->copy()->startOfWeek(), $von->copy()->endOfWeek()->startOfDay()];
+        }
+        if ($von->diffInDays($bis) > 62) {
+            return back()->with('error', 'Höchstens zwei Monate auf einmal.');
+        }
+
+        $zeitraum = $von->isSameDay($bis) ? $von->isoFormat('dd DD.MM.') : $von->isoFormat('DD.MM.').'–'.$bis->isoFormat('DD.MM.');
+        if ($data['aktion'] === 'entfernen') {
+            FreierTag::where('user_id', $person->id)->whereDate('datum', '>=', $von->toDateString())
+                ->whereDate('datum', '<=', $bis->toDateString())->delete();
+
+            return back()->with('status', "Freie Tage von {$person->name} ({$zeitraum}) entfernt.");
+        }
+
+        $weg = 0;
+        DB::transaction(function () use ($data, $person, $von, $bis, $abteilung, $request, &$weg) {
+            for ($d = $von->copy(); $d->lte($bis); $d->addDay()) {
+                FreierTag::updateOrCreate(['user_id' => $person->id, 'datum' => $d->toDateString()],
+                    ['notiz' => $data['notiz'] ?? null, 'erfasst_von' => $request->user()->id]);
+            }
+            $weg = Schicht::where('user_id', $person->id)
+                ->whereDate('datum', '>=', $von->toDateString())->whereDate('datum', '<=', $bis->toDateString())
+                ->whereHas('dienstplan', fn ($q) => $q->where('abteilung_id', $abteilung->id))
+                ->delete();
+        });
+        Korrektur::audit('zeiterfassung.dienstplan', "Freie Tage {$person->name} {$zeitraum} eingetragen ({$abteilung->name})", $person);
+
+        return back()->with('status', "{$person->name} hat frei: {$zeitraum}".($weg ? " – {$weg} Schicht".($weg > 1 ? 'en' : '').' entfernt' : '').'.');
     }
 
     /** Entwurf samt Schichten entfernen – veröffentlichte Pläne erst zurück auf Entwurf setzen. */

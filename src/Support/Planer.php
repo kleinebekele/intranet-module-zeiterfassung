@@ -6,6 +6,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Intranet\Modules\Zeiterfassung\Models\Abteilung;
 use Intranet\Modules\Zeiterfassung\Models\Abwesenheit;
+use Intranet\Modules\Zeiterfassung\Models\FreierTag;
 use Intranet\Modules\Zeiterfassung\Models\Besetzung;
 use Intranet\Modules\Zeiterfassung\Models\Dienstplan;
 use Intranet\Modules\Zeiterfassung\Models\Schicht;
@@ -189,6 +190,9 @@ class Planer
         $modelle = Zeitmodell::whereIn('user_id', $ids)->orderBy('gueltig_ab')->orderBy('id')->get()->groupBy('user_id');
         $abwesenheiten = Abwesenheit::whereIn('user_id', $ids)->whereIn('status', self::BLOCKIERT)
             ->ueberschneidet($this->monat, $this->bis)->get()->groupBy('user_id');
+        $freieTage = FreierTag::whereIn('user_id', $ids)
+            ->whereDate('datum', '>=', $this->monat->toDateString())->whereDate('datum', '<=', $this->bis->toDateString())
+            ->get()->groupBy('user_id');
 
         // Schichten der Vorwoche (Ruhezeit, Tage am Stück) und aus anderen Abteilungen (gleicher Tag = belegt).
         Schicht::whereIn('user_id', $ids)
@@ -257,6 +261,9 @@ class Planer
                 'budget' => $pivot->max_monat !== null ? (int) $pivot->max_monat : null,
                 'frei' => array_map('intval', array_filter(explode(',', (string) $pivot->freie_tage))),
                 'abwesend' => $abwesend,
+                // Freie Tage (Wunschfrei): Datum => Notiz; nicht einplanen, Soll bleibt.
+                'wunschfrei' => $freieTage->get($user->id, collect())
+                    ->mapWithKeys(fn (FreierTag $f) => [$f->datum->toDateString() => (string) $f->notiz])->all(),
                 'modell' => $modell,
                 'modelle' => $liste,
             ];
@@ -822,6 +829,7 @@ class Planer
         $p = $this->personen[$uid];
 
         return ! isset($p['abwesend'][$tag->toDateString()])
+            && ! isset($p['wunschfrei'][$tag->toDateString()])
             && ! in_array($tag->dayOfWeekIso, $p['frei'], true)
             && ! isset($this->fremd[$uid][$this->index($tag)]);
     }
@@ -947,6 +955,9 @@ class Planer
                 }
                 if (in_array($s->datum->dayOfWeekIso, $p['frei'], true)) {
                     $zelle[] = 'Fester freier Tag';
+                }
+                if (isset($p['wunschfrei'][$datum])) {
+                    $zelle[] = 'Freier Tag eingetragen';
                 }
                 if ($s->arbeit() > $this->maxTag) {
                     $zelle[] = 'Mehr als '.Format::dauer($this->maxTag).' Std. Arbeit (§ 3 ArbZG)';
