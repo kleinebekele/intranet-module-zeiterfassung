@@ -48,7 +48,7 @@ func neuer(a, b string) bool {
 }
 
 func (a *App) updatePruefen(s *Status) {
-	if s == nil || s.Programm == nil || !neuer(s.Programm.Version, Version) || a.dialog.Load() {
+	if s == nil || s.Programm == nil || !neuer(s.Programm.Version, Version) || a.fensterOffen() {
 		return
 	}
 	if !a.updateLaeuft.CompareAndSwap(false, true) {

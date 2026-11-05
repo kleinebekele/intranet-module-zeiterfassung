@@ -12,18 +12,16 @@ import (
 // Höchstarbeitszeit erreicht (10 Std.), Rechner noch an: Feierabend bestätigen – oder eine
 // vergessene Pause nachtragen (15–300 Min.), dann geht es weiter. Ohne Antwort passiert nichts.
 func (a *App) maxErreicht(heuteMin int) {
-	if a.dialog.Load() {
-		return
-	}
 	text := "Du hast heute " + dauer(heuteMin) + " Std. gearbeitet – das ist die gesetzliche Höchstarbeitszeit.\n\n" +
 		"Feierabend bestätigen – oder hast du zwischendurch eine Pause gemacht und vergessen, sie zu buchen?"
 	switch a.frage(text, "Feierabend", "Später", "Pause fehlt") {
 	case antwortJa:
 		a.stempeln("gehen")
 	case antwortExtra:
-		if !a.vergessenePause() {
+		if !a.vergessenePause() && !a.abgebrochen() {
 			a.ruhe("max", 5*time.Minute) // abgebrochen: gleich noch einmal fragen
 		}
+	case antwortWeg:
 	default:
 		a.ruhe("max", 15*time.Minute)
 	}
@@ -35,10 +33,8 @@ func (a *App) vergessenePause() bool {
 	for m := 15; m <= 300; m += 15 {
 		dauern = append(dauern, dauerText(m))
 	}
-	a.dialog.Store(true)
-	wahl, err := zenity.List("Wie lange war die Pause?", dauern, zenity.Title(titel), fensterSymbol(),
+	wahl, err := zenity.List("Wie lange war die Pause?", dauern, zenity.Title(titel), fensterSymbol(), a.kontext(),
 		zenity.DefaultItems(dauerText(30)), zenity.OKLabel("Weiter"), zenity.CancelLabel("Abbrechen"))
-	a.dialog.Store(false)
 	if err != nil || wahl == "" {
 		return false
 	}
@@ -58,10 +54,8 @@ func (a *App) vergessenePause() bool {
 		}
 	}
 	for {
-		a.dialog.Store(true)
-		eingabe, err := zenity.Entry("Wann hat die Pause begonnen? (HH:MM)", zenity.Title(titel), fensterSymbol(),
+		eingabe, err := zenity.Entry("Wann hat die Pause begonnen? (HH:MM)", zenity.Title(titel), fensterSymbol(), a.kontext(),
 			zenity.EntryText(vorschlag), zenity.OKLabel("Eintragen"), zenity.CancelLabel("Abbrechen"))
-		a.dialog.Store(false)
 		if err != nil {
 			return false
 		}

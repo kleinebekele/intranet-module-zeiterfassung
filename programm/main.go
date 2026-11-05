@@ -69,7 +69,7 @@ type App struct {
 	geholtAm    time.Time
 	letzterTick time.Time
 
-	dialog     atomic.Bool
+	wache      fensterWache // immer nur ein Fenster (fenster.go)
 	merkerMu   sync.Mutex
 	spaeter    map[string]time.Time // Erinnerung ruht bis …
 	erledigt   map[string]string    // Erinnerung für diesen Tag erledigt (Datum)
@@ -80,7 +80,6 @@ type App struct {
 	abwesend        time.Time // Beginn der aktuellen Abwesenheit vom Rechner (unter merkerMu)
 	teamsVorher     string    // letzte gesehene Teams-Verfügbarkeit (unter mu)
 	pauseBis        time.Time // geplantes Pausenende aus dem Pausenfenster (unter merkerMu)
-	pauseAbbruch    func()    // schließt offene Pausen-Dialoge (unter merkerMu)
 	pauseStufe      int       // 0 = noch nicht gewarnt, 1 = 15 Min. vorher, 2 = 5 Min. vorher (unter merkerMu)
 	autoPauseLaeuft atomic.Bool
 	vorlageBis      time.Time // Statusvorlage mit Rückfrage läuft bis … (unter merkerMu)
@@ -126,29 +125,29 @@ func (a *App) klicks() {
 	for {
 		select {
 		case <-a.mKommen.ClickedCh:
-			go a.stempeln("kommen")
+			go a.ausMenue(func() { a.stempeln("kommen") })
 		case <-a.mPause.ClickedCh:
-			go a.pauseStarten()
+			go a.ausMenue(a.pauseStarten)
 		case <-a.mWeiter.ClickedCh:
-			go a.stempeln("weiter")
+			go a.ausMenue(func() { a.stempeln("weiter") })
 		case <-a.mGehen.ClickedCh:
-			go a.stempeln("gehen")
+			go a.ausMenue(func() { a.stempeln("gehen") })
 		case <-a.mOeffnen.ClickedCh:
 			if i := a.verbindung(); i != nil {
 				oeffneImBrowser(i.Adresse + "/modules/zeiterfassung/meine")
 			}
 		case <-a.mVerbindung.ClickedCh:
-			go func() {
+			go a.ausMenue(func() {
 				if a.verbindung() != nil {
 					a.verbindungLoesen()
 				} else if a.einrichten(false) {
 					a.aktualisieren()
 				}
-			}()
+			})
 		case <-a.mAutostart.ClickedCh:
 			an := !a.mAutostart.Checked()
 			if err := setzeAutostart(an); err != nil {
-				a.fehler("Autostart ließ sich nicht ändern: " + err.Error())
+				go a.folge(true, func() { a.fehler("Autostart ließ sich nicht ändern: " + err.Error()) })
 				continue
 			}
 			if an {
@@ -157,7 +156,7 @@ func (a *App) klicks() {
 				a.mAutostart.Uncheck()
 			}
 		case <-a.mBeenden.ClickedCh:
-			go a.beenden()
+			go a.ausMenue(a.beenden)
 		}
 	}
 }
@@ -171,13 +170,16 @@ func (a *App) verbindung() *Intranet {
 // ── Start ──────────────────────────────────────────────────────────
 
 func (a *App) start() {
+	go immerObenBeobachten()
 	e, ok := ladeEinstellungen()
 	if ok {
 		a.mu.Lock()
 		a.intranet = NeuesIntranet(e.Adresse, e.Schluessel)
 		a.mu.Unlock()
 	} else {
-		if !a.einrichten(true) {
+		eingerichtet := false
+		a.folge(true, func() { eingerichtet = a.einrichten(true) })
+		if !eingerichtet {
 			systray.Quit()
 			return
 		}
@@ -201,7 +203,7 @@ func (a *App) start() {
 		// Nach dem Update nichts fragen – es war ja nur ein Neustart im laufenden Betrieb.
 		meldeUpdate()
 	} else {
-		a.startfragen(beat, beatOk)
+		a.folge(true, func() { a.startfragen(beat, beatOk) })
 	}
 
 	go a.sperreBeobachten()
@@ -216,32 +218,30 @@ func (a *App) start() {
 // „Adresse#Schlüssel" – den fügt man hier in ein einziges Feld ein. Das Eingabefenster hat nur
 // Platz für eine kurze Zeile, die Anleitung steht deshalb vorher in einem eigenen Hinweis.
 func (a *App) einrichten(erstesMal bool) bool {
-	a.dialog.Store(true)
-	defer a.dialog.Store(false)
 
 	if erstesMal {
 		_ = zenity.Info("Willkommen bei der Zeiterfassung!\n\nEinmalig einrichten:\n"+
 			"1. Im Intranet „Zeiterfassung → Meine Zeiten“ öffnen.\n"+
 			"2. In der Karte „PC-Programm“ einen Gerätenamen eingeben und „Gerät verbinden“ klicken.\n"+
 			"3. Den angezeigten Verbindungscode kopieren und im nächsten Fenster einfügen.",
-			zenity.Title(titel), fensterSymbol(), zenity.OKLabel("Weiter"))
+			zenity.Title(titel), fensterSymbol(), a.kontext(), zenity.OKLabel("Weiter"))
 	}
 
 	for {
-		code, err := zenity.Entry("Verbindungscode einfügen:", zenity.Title(titel), fensterSymbol(), zenity.OKLabel("Verbinden"), zenity.CancelLabel("Abbrechen"))
+		code, err := zenity.Entry("Verbindungscode einfügen:", zenity.Title(titel), fensterSymbol(), a.kontext(), zenity.OKLabel("Verbinden"), zenity.CancelLabel("Abbrechen"))
 		if err != nil {
 			return false
 		}
 		adresse, schluessel := zerlegeCode(code)
 		// Notfalls einzeln: nur Schlüssel oder nur Adresse eingefügt.
 		if adresse == "" && schluessel != "" {
-			if adresse, err = zenity.Entry("Adresse des Intranets:", zenity.Title(titel), fensterSymbol(), zenity.OKLabel("Weiter"), zenity.CancelLabel("Abbrechen")); err != nil {
+			if adresse, err = zenity.Entry("Adresse des Intranets:", zenity.Title(titel), fensterSymbol(), a.kontext(), zenity.OKLabel("Weiter"), zenity.CancelLabel("Abbrechen")); err != nil {
 				return false
 			}
 			adresse, _ = zerlegeCode(adresse)
 		}
 		if schluessel == "" && adresse != "" {
-			if schluessel, err = zenity.Entry("Schlüssel (beginnt mit zg_):", zenity.Title(titel), fensterSymbol(), zenity.OKLabel("Verbinden"), zenity.CancelLabel("Abbrechen")); err != nil {
+			if schluessel, err = zenity.Entry("Schlüssel (beginnt mit zg_):", zenity.Title(titel), fensterSymbol(), a.kontext(), zenity.OKLabel("Verbinden"), zenity.CancelLabel("Abbrechen")); err != nil {
 				return false
 			}
 			schluessel = strings.TrimSpace(schluessel)
@@ -249,17 +249,17 @@ func (a *App) einrichten(erstesMal bool) bool {
 
 		i := NeuesIntranet(adresse, schluessel)
 		if err := i.Pruefen(); err != nil {
-			_ = zenity.Error("Verbindung hat nicht geklappt:\n\n"+err.Error()+"\n\nBitte den Verbindungscode im Intranet neu kopieren (ggf. Gerät trennen und neu verbinden).", zenity.Title(titel), fensterSymbol())
+			_ = zenity.Error("Verbindung hat nicht geklappt:\n\n"+err.Error()+"\n\nBitte den Verbindungscode im Intranet neu kopieren (ggf. Gerät trennen und neu verbinden).", zenity.Title(titel), fensterSymbol(), a.kontext())
 			continue
 		}
 		if err := speichereEinstellungen(Einstellungen{Adresse: i.Adresse, Schluessel: i.Schluessel}); err != nil {
-			_ = zenity.Error("Einstellungen ließen sich nicht speichern: "+err.Error(), zenity.Title(titel), fensterSymbol())
+			_ = zenity.Error("Einstellungen ließen sich nicht speichern: "+err.Error(), zenity.Title(titel), fensterSymbol(), a.kontext())
 			return false
 		}
 		a.mu.Lock()
 		a.intranet = i
 		a.mu.Unlock()
-		_ = zenity.Info("Verbunden!\n\nDie Zeiterfassung startet ab jetzt mit Windows.\nDas Uhr-Symbol findest du unten rechts neben der Uhrzeit (ggf. unter dem kleinen Pfeil ^).", zenity.Title(titel), fensterSymbol())
+		_ = zenity.Info("Verbunden!\n\nDie Zeiterfassung startet ab jetzt mit Windows.\nDas Uhr-Symbol findest du unten rechts neben der Uhrzeit (ggf. unter dem kleinen Pfeil ^).", zenity.Title(titel), fensterSymbol(), a.kontext())
 		return true
 	}
 }
@@ -346,9 +346,9 @@ func (a *App) takt(t time.Time) {
 			a.merkeAbwesend(vorher)
 		} else if seit, ok := a.abwesendSeit(); ok {
 			a.vergissAbwesend()
-			go a.abwesenheitKlaeren(seit, t, "Der Rechner war gesperrt bzw. im Ruhezustand", abwesendAbPause)
+			go a.abwesenheitFolge(seit, t, "Der Rechner war gesperrt bzw. im Ruhezustand", abwesendAbPause)
 		} else {
-			go a.abwesenheitKlaeren(vorher, t, "Der Rechner war im Ruhezustand", abwesendAbPause)
+			go a.abwesenheitFolge(vorher, t, "Der Rechner war im Ruhezustand", abwesendAbPause)
 		}
 		return
 	}
@@ -375,18 +375,18 @@ func (a *App) erinnern() {
 		heuteMin += vergangen
 		block += vergangen
 	}
-	// Pausenpflicht: Warnungen und automatische Pause – auch wenn gerade ein Fenster offen ist.
+	// Pausenpflicht: Warnungen und automatische Pause – sie schließen ein offenes Fenster.
 	if a.pausenpflicht(s, block) {
 		return
 	}
-	if a.dialog.Load() {
+	if a.fensterOffen() {
 		return
 	}
 
 	switch s.Zustand {
 	case "weg":
 		if a.startOffen.Load() && a.faellig("start") {
-			go a.frageStart()
+			go a.folge(false, a.frageStart)
 		}
 
 	case "pause":
@@ -399,19 +399,21 @@ func (a *App) erinnern() {
 		}
 		a.merkerMu.Unlock()
 		if err == nil && !jetzt.Before(ende) && a.faellig("weiter") {
-			go a.erinnerung("weiter", "Deine Pause läuft seit "+dauer(int(jetzt.Sub(seit).Minutes()))+" Std.\n\nPause beenden und weiter arbeiten?", "Ja, weiter", 0, "weiter")
+			go a.erinnerungFolge("weiter", "Deine Pause läuft seit "+dauer(int(jetzt.Sub(seit).Minutes()))+" Std.\n\nPause beenden und weiter arbeiten?", "Ja, weiter", 0, "weiter")
 		}
 
 	case "da":
 		maxTag := s.Regeln.MaxTag
 		switch {
 		case maxTag > 0 && heuteMin >= maxTag && a.faellig("max"):
-			go a.maxErreicht(heuteMin)
+			go a.folge(false, func() { a.maxErreicht(heuteMin) })
 		case maxTag > 0 && heuteMin >= maxTag-15 && a.einmal("max-bald"):
-			a.hinweis("In etwa 15 Minuten erreichst du die Höchstarbeitszeit von " + dauer(maxTag) + " Std.")
+			go a.folge(true, func() {
+				a.hinweis("In etwa 15 Minuten erreichst du die Höchstarbeitszeit von " + dauer(maxTag) + " Std.")
+			})
 		default:
 			if grund := feierabendGrund(s, heuteMin, jetzt); grund != "" && a.faellig("feierabend") {
-				go a.erinnerung("feierabend", grund+"\n\nFeierabend? Gehen buchen?", "Gehen", 30*time.Minute, "gehen")
+				go a.erinnerungFolge("feierabend", grund+"\n\nFeierabend? Gehen buchen?", "Gehen", 30*time.Minute, "gehen")
 			}
 		}
 	}
@@ -445,18 +447,19 @@ const (
 	antwortJa antwortArt = iota
 	antwortNein
 	antwortExtra
+	antwortWeg // Fenster wurde von der Pausenpflicht geschlossen – nichts tun
 )
 
-// Ja/Nein(/Extra)-Frage; nur eine gleichzeitig.
+// Ja/Nein(/Extra)-Frage. Läuft in einer Fensterfolge (a.folge), siehe fenster.go.
 func (a *App) frage(text, ja, nein, extra string, mehr ...zenity.Option) antwortArt {
-	a.dialog.Store(true)
-	defer a.dialog.Store(false)
-	opts := append([]zenity.Option{zenity.Title(titel), fensterSymbol(), zenity.OKLabel(ja), zenity.CancelLabel(nein)}, mehr...)
+	opts := append([]zenity.Option{zenity.Title(titel), fensterSymbol(), a.kontext(), zenity.OKLabel(ja), zenity.CancelLabel(nein)}, mehr...)
 	if extra != "" {
 		opts = append(opts, zenity.ExtraButton(extra))
 	}
 	err := zenity.Question(text, opts...)
 	switch {
+	case a.abgebrochen():
+		return antwortWeg
 	case err == nil:
 		return antwortJa
 	case errors.Is(err, zenity.ErrExtraButton):
@@ -467,7 +470,7 @@ func (a *App) frage(text, ja, nein, extra string, mehr ...zenity.Option) antwort
 }
 
 func (a *App) frageStart() {
-	if a.istErledigt("start") || a.dialog.Load() {
+	if a.istErledigt("start") {
 		return
 	}
 	vorname := ""
@@ -477,6 +480,9 @@ func (a *App) frageStart() {
 	switch a.frage("Hallo "+vorname+"!\n\nArbeitszeit starten?", "Ja, Kommen …", "Später", "Heute nicht") {
 	case antwortJa:
 		vor, ok := a.beginnWaehlen()
+		if a.abgebrochen() {
+			return
+		}
 		if !ok {
 			a.startOffen.Store(true)
 			a.ruhe("start", 15*time.Minute)
@@ -488,6 +494,7 @@ func (a *App) frageStart() {
 	case antwortExtra:
 		a.startOffen.Store(false)
 		a.erledige("start")
+	case antwortWeg:
 	default:
 		a.startOffen.Store(true)
 		a.ruhe("start", 15*time.Minute)
@@ -506,10 +513,8 @@ func (a *App) beginnWaehlen() (vor int, ok bool) {
 		}
 		punkte = append(punkte, fmt.Sprintf("Vor %d %s (%s Uhr)", m, einheit, jetzt.Add(-time.Duration(m)*time.Minute).Format("15:04")))
 	}
-	a.dialog.Store(true)
-	wahl, err := zenity.List("Wann hast du angefangen?", punkte, zenity.Title(titel), fensterSymbol(),
+	wahl, err := zenity.List("Wann hast du angefangen?", punkte, zenity.Title(titel), fensterSymbol(), a.kontext(),
 		zenity.DefaultItems(punkte[0]), zenity.OKLabel("Kommen"), zenity.CancelLabel("Abbrechen"))
-	a.dialog.Store(false)
 	if err != nil {
 		return 0, false
 	}
@@ -521,17 +526,21 @@ func (a *App) beginnWaehlen() (vor int, ok bool) {
 	return 0, true
 }
 
+func (a *App) erinnerungFolge(schluessel, text, ja string, ruhe time.Duration, aktion string) {
+	a.folge(false, func() { a.erinnerung(schluessel, text, ja, ruhe, aktion) })
+}
+
 // Erinnerung mit „Später": Ja bucht die Aktion, Später ruht für die angegebene Zeit.
 // ruhe == 0: „Erneut erinnern …" mit Auswahl der Minuten statt festem „Später".
 func (a *App) erinnerung(schluessel, text, ja string, ruhe time.Duration, aktion string) {
-	if a.dialog.Load() {
-		return
-	}
 	nein := "Später"
 	if ruhe == 0 {
 		nein = "Später …"
 	}
-	if a.frage(text, ja, nein, "") == antwortJa {
+	switch a.frage(text, ja, nein, "") {
+	case antwortWeg:
+		return // geschlossen: kommt beim nächsten Takt wieder
+	case antwortJa:
 		if aktion == "pause" {
 			a.pauseStarten()
 		} else {
@@ -548,16 +557,17 @@ func (a *App) erinnerung(schluessel, text, ja string, ruhe time.Duration, aktion
 
 // „In X Minuten erneut erinnern" – Auswahl 5 bis 60 Min., ohne Auswahl 10 Min.
 func (a *App) erneutErinnern(schluessel string) {
-	a.dialog.Store(true)
 	wahl, err := zenity.List("In wie vielen Minuten erneut erinnern?",
 		[]string{"5 Minuten", "10 Minuten", "15 Minuten", "20 Minuten", "30 Minuten", "45 Minuten", "60 Minuten"},
-		zenity.Title(titel), fensterSymbol(), zenity.DefaultItems("10 Minuten"), zenity.OKLabel("Erinnern"), zenity.CancelLabel("Abbrechen"))
-	a.dialog.Store(false)
+		zenity.Title(titel), fensterSymbol(), a.kontext(), zenity.DefaultItems("10 Minuten"), zenity.OKLabel("Erinnern"), zenity.CancelLabel("Abbrechen"))
 	minuten := 10
 	if err == nil {
 		if n, e := strconv.Atoi(strings.Fields(wahl + " 10")[0]); e == nil && n > 0 {
 			minuten = n
 		}
+	}
+	if a.abgebrochen() {
+		return
 	}
 	a.ruhe(schluessel, time.Duration(minuten)*time.Minute)
 	protokoll(fmt.Sprintf("Erinnerung %s in %d Min.", schluessel, minuten))
@@ -573,6 +583,8 @@ func (a *App) endeVorschlagen(ende time.Time, grund string) {
 	text := fmt.Sprintf("%s ab %s Uhr – du warst da noch eingestempelt.\n\nArbeitsende um %s Uhr eintragen?\n(Nein = du hast weitergearbeitet)",
 		grund, ende.Format("02.01. 15:04"), ende.Format("15:04"))
 	switch a.frage(text, "Eintragen", "Nein", "Andere Zeit") {
+	case antwortWeg:
+		return
 	case antwortJa:
 		meldung, err := i.GehenNachtragen(ende, true)
 		a.ergebnis(meldung, err)
@@ -582,9 +594,7 @@ func (a *App) endeVorschlagen(ende time.Time, grund string) {
 			a.endeVorschlagen(ende, grund)
 			return
 		}
-		a.dialog.Store(true)
-		eingabe, err := zenity.Entry("Wann hast du aufgehört? (TT.MM. HH:MM)", zenity.Title(titel), fensterSymbol(), zenity.EntryText(ende.Format("02.01. 15:04")), zenity.OKLabel("Eintragen"), zenity.CancelLabel("Abbrechen"))
-		a.dialog.Store(false)
+		eingabe, err := zenity.Entry("Wann hast du aufgehört? (TT.MM. HH:MM)", zenity.Title(titel), fensterSymbol(), a.kontext(), zenity.EntryText(ende.Format("02.01. 15:04")), zenity.OKLabel("Eintragen"), zenity.CancelLabel("Abbrechen"))
 		if err != nil {
 			return
 		}
@@ -611,7 +621,7 @@ func (a *App) beenden() {
 		switch a.frage("Du bist noch eingestempelt.\n\nVor dem Beenden Gehen buchen?", "Gehen buchen", "Nur beenden", "Abbrechen") {
 		case antwortJa:
 			a.stempeln("gehen")
-		case antwortExtra:
+		case antwortExtra, antwortWeg:
 			return
 		}
 	}
@@ -656,16 +666,12 @@ func (a *App) ergebnis(meldung string, err error) {
 }
 
 func (a *App) hinweis(text string) {
-	a.dialog.Store(true)
-	defer a.dialog.Store(false)
-	_ = zenity.Info(text, zenity.Title(titel), fensterSymbol())
+	_ = zenity.Info(text, zenity.Title(titel), fensterSymbol(), a.kontext())
 }
 
 func (a *App) fehler(text string) {
 	protokoll("Fehler: " + text)
-	a.dialog.Store(true)
-	defer a.dialog.Store(false)
-	_ = zenity.Error(text, zenity.Title(titel), fensterSymbol())
+	_ = zenity.Error(text, zenity.Title(titel), fensterSymbol(), a.kontext())
 }
 
 func (a *App) aktuell() *Status {
@@ -686,7 +692,7 @@ func (a *App) aktualisieren() {
 		a.geholtAm = time.Now()
 		defer a.updatePruefen(s)
 		if wechsel := a.teamsWechsel(s); wechsel != "" {
-			defer func() { go a.teamsNachfragen(wechsel) }()
+			defer func() { go a.folge(true, func() { a.teamsNachfragen(wechsel) }) }()
 		}
 	} else {
 		protokoll("Status: " + err.Error())

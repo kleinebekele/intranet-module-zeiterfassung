@@ -23,7 +23,11 @@ sonst Tagessoll, sonst Ende der Kernzeit) und die Höchstarbeitszeit – gebucht
   Pausen dazwischen (unter 15 Min. „zu kurz“), nächste fällige Pause (6 Std. am Stück, 30 Min. ab 6 Std., 45 Min. ab
   9 Std.) und Feierabend. Der Mouseover zeigt nur 63 Zeichen: Summe, nächste Pause, Feierabend.
 - **Pausenpflicht (6 Std. am Stück):** Warnung 15 Min. vorher, erneut 5 Min. vorher; reagiert niemand, trägt das
-  Programm die Pause an der Grenze selbst ein (offene Pausenfenster schließen sich). Beendet wird sie nur per Klick.
+  Programm die Pause an der Grenze selbst ein und meldet das (nur „OK“). Beendet wird sie nur per Klick.
+- **Immer nur ein Fenster:** Weitere Meldungen warten, bis das offene Fenster beantwortet ist; Menüpunkte melden
+  „erst das offene Fenster beantworten“. Ausnahme Pausenpflicht: Jede Stufe schließt alle offenen Fenster (auch
+  Folgefenster wie „Wie lange machst du Pause?“); was dabei geschlossen wurde, fragt das Programm danach erneut.
+  Alle Fenster liegen „immer oben“, nehmen aber nicht die Tastatur weg (das verhindert Windows ohnehin).
 - **Statusvorlagen:** Rechtsklick → „Statusvorlagen“ zeigt die eigenen Vorlagen aus dem Intranet (Meine Zeiten → Teams):
   Teams-Status + Text für 5 Min. oder 15–300 Min., danach automatisch zurück oder nach Rückfrage; optional zugleich Pause buchen.
   „Teams wieder auf Verfügbar“ beendet eine Vorlage vorzeitig. „Neue Statusvorlage …“ legt eine Vorlage in sechs

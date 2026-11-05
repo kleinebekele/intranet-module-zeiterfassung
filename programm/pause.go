@@ -13,13 +13,9 @@ import (
 // Statusnachricht. Die Dauer steuert nur, wann das Programm „Pause beenden?" fragt;
 // beendet wird die Pause nie von selbst.
 func (a *App) pauseStarten() {
-	ctx, abbruch := a.pauseDialogKontext() // schließt die automatische Pause
-	defer abbruch()
-	a.dialog.Store(true)
 	wahl, err := zenity.List("Wie lange machst du Pause?",
 		[]string{"15 Minuten", "30 Minuten", "45 Minuten", "60 Minuten"},
-		zenity.Title(titel), fensterSymbol(), zenity.DefaultItems("30 Minuten"), zenity.OKLabel("Starten"), zenity.CancelLabel("Abbrechen"), zenity.Context(ctx))
-	a.dialog.Store(false)
+		zenity.Title(titel), fensterSymbol(), a.kontext(), zenity.DefaultItems("30 Minuten"), zenity.OKLabel("Starten"), zenity.CancelLabel("Abbrechen"))
 	if err != nil || strings.TrimSpace(wahl) == "" {
 		return
 	}
@@ -28,12 +24,10 @@ func (a *App) pauseStarten() {
 
 	extra := url.Values{}
 	if s := a.aktuell(); s != nil && s.Teams != nil {
-		a.dialog.Store(true)
-		nachricht, err := zenity.Entry("Statusnachricht für Teams (leer = keine):", zenity.Title(titel), fensterSymbol(),
+		nachricht, err := zenity.Entry("Statusnachricht für Teams (leer = keine):", zenity.Title(titel), fensterSymbol(), a.kontext(),
 			zenity.EntryText("In der Pause – zurück um "+bis.Format("15:04")),
-			zenity.OKLabel("Starten"), zenity.CancelLabel("Ohne Text"), zenity.Context(ctx))
-		a.dialog.Store(false)
-		if ctx.Err() != nil {
+			zenity.OKLabel("Starten"), zenity.CancelLabel("Ohne Text"))
+		if a.abgebrochen() {
 			return // inzwischen automatisch eingetragen
 		}
 		if err == nil && strings.TrimSpace(nachricht) != "" {

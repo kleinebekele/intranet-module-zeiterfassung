@@ -27,7 +27,9 @@ func (a *App) teamsWechsel(s *Status) string {
 }
 
 func (a *App) teamsNachfragen(wechsel string) {
-	if a.dialog.Load() {
+	// Wartete die Frage auf ein anderes Fenster, kann sie inzwischen überholt sein.
+	s := a.aktuell()
+	if s == nil || (wechsel == "offline" && s.Zustand != "da") || (wechsel == "online" && s.Zustand != "weg") {
 		return
 	}
 	switch wechsel {

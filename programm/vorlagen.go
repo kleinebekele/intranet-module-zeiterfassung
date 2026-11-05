@@ -54,20 +54,20 @@ func (a *App) vorlagenMenueAnlegen() {
 		a.vorlagePunkte = append(a.vorlagePunkte, punkt)
 		go func(n int, punkt *systray.MenuItem) {
 			for range punkt.ClickedCh {
-				go a.vorlageWaehlen(n)
+				go a.ausMenue(func() { a.vorlageWaehlen(n) })
 			}
 		}(n, punkt)
 	}
 	a.mNeueVorlage = a.mVorlagen.AddSubMenuItem("Neue Statusvorlage …", "Vorlage hier anlegen (wie im Intranet)")
 	go func() {
 		for range a.mNeueVorlage.ClickedCh {
-			go a.vorlageAnlegen()
+			go a.ausMenue(a.vorlageAnlegen)
 		}
 	}()
 	a.mOnline = a.mVorlagen.AddSubMenuItem("Teams wieder auf „Verfügbar“", "Vorlage beenden")
 	go func() {
 		for range a.mOnline.ClickedCh {
-			go a.teamsZurueck()
+			go a.ausMenue(a.teamsZurueck)
 		}
 	}()
 	a.mVorlagen.Hide()
@@ -161,16 +161,18 @@ func (a *App) vorlageErinnern() {
 	a.merkerMu.Lock()
 	bis, name := a.vorlageBis, a.vorlageName
 	a.merkerMu.Unlock()
-	if bis.IsZero() || time.Now().Before(bis) || !a.faellig("vorlage") || a.dialog.Load() {
+	if bis.IsZero() || time.Now().Before(bis) || !a.faellig("vorlage") || a.fensterOffen() {
 		return
 	}
-	go func() {
-		if a.frage("Die Statusvorlage „"+name+"“ ist abgelaufen.\n\nTeams wieder auf „Verfügbar“ stellen – oder später erneut erinnern?", "Verfügbar", "Später …", "") == antwortJa {
+	go a.folge(false, func() {
+		switch a.frage("Die Statusvorlage „"+name+"“ ist abgelaufen.\n\nTeams wieder auf „Verfügbar“ stellen – oder später erneut erinnern?", "Verfügbar", "Später …", "") {
+		case antwortWeg:
+		case antwortJa:
 			a.teamsZurueck()
-			return
+		default:
+			a.erneutErinnern("vorlage")
 		}
-		a.erneutErinnern("vorlage")
-	}()
+	})
 }
 
 // Teams-Status zur Auswahl: Bezeichnung → Schlüssel im Intranet (Statusvorlage::STATUS).
@@ -185,13 +187,8 @@ var vorlagenStatus = []struct{ Name, Wert string }{
 // Neue Statusvorlage Schritt für Schritt: Name, Dauer, Teams-Status, Text, Rückkehr, Pause.
 // „Abbrechen“ in den ersten Schritten bricht ab, ohne etwas zu speichern.
 func (a *App) vorlageAnlegen() {
-	if a.dialog.Load() {
-		return
-	}
-	a.dialog.Store(true)
-	defer a.dialog.Store(false)
 	opts := func(ok string, mehr ...zenity.Option) []zenity.Option {
-		return append([]zenity.Option{zenity.Title(titel + " – Neue Statusvorlage"), fensterSymbol(), zenity.OKLabel(ok), zenity.CancelLabel("Abbrechen")}, mehr...)
+		return append([]zenity.Option{zenity.Title(titel + " – Neue Statusvorlage"), fensterSymbol(), a.kontext(), zenity.OKLabel(ok), zenity.CancelLabel("Abbrechen")}, mehr...)
 	}
 
 	name, err := zenity.Entry("Name der Vorlage (z. B. Telefonat):", opts("Weiter")...)
@@ -237,15 +234,21 @@ func (a *App) vorlageAnlegen() {
 
 	rueckkehr := "frage"
 	err = zenity.Question("Nach "+dauerText(minuten)+" Teams wieder auf „Verfügbar“ stellen –\nautomatisch oder erst nach Rückfrage?",
-		zenity.Title(titel+" – Neue Statusvorlage"), fensterSymbol(), zenity.OKLabel("Nachfragen"), zenity.CancelLabel("Automatisch"))
+		zenity.Title(titel+" – Neue Statusvorlage"), fensterSymbol(), a.kontext(), zenity.OKLabel("Nachfragen"), zenity.CancelLabel("Automatisch"))
+	if a.abgebrochen() {
+		return
+	}
 	if err != nil {
 		rueckkehr = "automatisch"
 	}
 
 	pause := "0"
-	if zenity.Question("Zugleich eine Pause buchen?", zenity.Title(titel+" – Neue Statusvorlage"), fensterSymbol(),
+	if zenity.Question("Zugleich eine Pause buchen?", zenity.Title(titel+" – Neue Statusvorlage"), fensterSymbol(), a.kontext(),
 		zenity.OKLabel("Ja"), zenity.CancelLabel("Nein")) == nil {
 		pause = "1"
+	}
+	if a.abgebrochen() {
+		return
 	}
 
 	i := a.verbindung()
@@ -257,7 +260,6 @@ func (a *App) vorlageAnlegen() {
 		"name": {name}, "minuten": {strconv.Itoa(minuten)}, "verfuegbarkeit": {status},
 		"text": {strings.TrimSpace(text)}, "rueckkehr": {rueckkehr}, "pause": {pause},
 	}, &antw)
-	a.dialog.Store(false)
 	a.ergebnis(antw.Meldung, err)
 	if err == nil {
 		protokoll("Statusvorlage angelegt: " + name)

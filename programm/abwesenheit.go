@@ -88,9 +88,14 @@ func (a *App) sperreBeobachten() {
 		case !zu && abwesend:
 			seit, _ := a.abwesendSeit()
 			a.vergissAbwesend()
-			go a.abwesenheitKlaeren(seit, time.Now(), "Der Rechner war gesperrt", abwesendAbPause)
+			go a.abwesenheitFolge(seit, time.Now(), "Der Rechner war gesperrt", abwesendAbPause)
 		}
 	}
+}
+
+// Als eigene Fensterfolge; schließt die Pausenpflicht sie, wird später erneut gefragt.
+func (a *App) abwesenheitFolge(von, bis time.Time, grund string, abPause time.Duration) {
+	a.folge(true, func() { a.abwesenheitKlaeren(von, bis, grund, abPause) })
 }
 
 // Zurück am Rechner: je nach Dauer nichts tun, Pause anbieten oder Arbeitsende vorschlagen.
@@ -124,7 +129,11 @@ func (a *App) abwesenheitKlaeren(von, bis time.Time, grund string, abPause time.
 
 	text := fmt.Sprintf("%s – von %s bis %s Uhr (%s Std.).\n\nWar das eine Pause oder Arbeitszeit?",
 		grund, von.Format("15:04"), bis.Format("15:04"), dauer(int(dauerAbwesend.Minutes())))
-	if a.frage(text, "Pause", "Arbeitszeit", "") != antwortJa {
+	switch a.frage(text, "Pause", "Arbeitszeit", "") {
+	case antwortWeg:
+		go a.abwesenheitFolge(von, bis, grund, abPause) // nach der Pausenpflicht erneut fragen
+		return
+	case antwortNein:
 		protokoll("Abwesenheit " + von.Format("15:04") + "–" + bis.Format("15:04") + " bleibt Arbeitszeit")
 		a.pflichtpauseNachtragen(von, bis)
 		return
@@ -150,18 +159,20 @@ func (a *App) pflichtpauseNachtragen(von, bis time.Time) {
 		return
 	}
 
-	a.dialog.Store(true)
 	_ = zenity.Info(fmt.Sprintf("Bis jetzt war eine Pause von mindestens %d Minuten Pflicht (§ 4 ArbZG).\n\n"+
 		"Gib im nächsten Fenster an, wann du sie gemacht hast.\nOhne Angabe beginnt sie um %s Uhr (Rechner weg).",
-		minuten, von.Format("15:04")), zenity.Title(titel), fensterSymbol(), zenity.OKLabel("Weiter"))
-	a.dialog.Store(false)
+		minuten, von.Format("15:04")), zenity.Title(titel), fensterSymbol(), a.kontext(), zenity.OKLabel("Weiter"))
+	if a.abgebrochen() {
+		return
+	}
 
 	for {
 		beginn := von
-		a.dialog.Store(true)
-		eingabe, err := zenity.Entry("Beginn der Pause (HH:MM):", zenity.Title(titel), fensterSymbol(),
+		eingabe, err := zenity.Entry("Beginn der Pause (HH:MM):", zenity.Title(titel), fensterSymbol(), a.kontext(),
 			zenity.EntryText(von.Format("15:04")), zenity.OKLabel("Eintragen"), zenity.CancelLabel("Abbrechen"))
-		a.dialog.Store(false)
+		if a.abgebrochen() {
+			return
+		}
 		if err == nil {
 			t, ok := heuteUm(strings.TrimSpace(eingabe))
 			if !ok {
