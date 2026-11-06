@@ -413,6 +413,8 @@ func (a *App) erinnern() {
 			})
 		default:
 			if grund := feierabendGrund(s, heuteMin, jetzt); grund != "" && a.faellig("feierabend") {
+				// Die Erinnerung kommt nach „Später" erneut – dann soll der aktuelle Stand drinstehen.
+				grund = "Du hast heute " + dauer(heuteMin) + " Std. gearbeitet.\n" + grund
 				go a.erinnerungFolge("feierabend", grund+"\n\nFeierabend? Gehen buchen?", "Gehen", 30*time.Minute, "gehen")
 			}
 		}
