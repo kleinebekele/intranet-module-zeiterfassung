@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Intranet\Modules\Zeiterfassung\Models\Abteilung;
+use Intranet\Modules\Zeiterfassung\Models\Abwesenheit;
 use Intranet\Modules\Zeiterfassung\Models\Dienstplan;
 use Intranet\Modules\Zeiterfassung\Models\FreierTag;
 use Intranet\Modules\Zeiterfassung\Models\Schicht;
@@ -187,7 +188,7 @@ class DienstplanController
             'bis' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:von'],
             'woche' => ['nullable', 'boolean'],
             'notiz' => ['nullable', 'string', 'max:200'],
-            'aktion' => ['required', 'in:setzen,entfernen'],
+            'aktion' => ['required', 'in:setzen,entfernen,urlaub'],
         ]);
         $person = $abteilung->personen()->where('users.id', $data['user_id'])->first();
         abort_unless($person, 404);
@@ -207,6 +208,35 @@ class DienstplanController
                 ->whereDate('datum', '<=', $bis->toDateString())->delete();
 
             return back()->with('status', "Freie Tage von {$person->name} ({$zeitraum}) entfernt.");
+        }
+
+        // Urlaub: genehmigte Abwesenheit – schreibt das Soll gut (wie im Urlaubsantrag), im Konto
+        // fehlt nichts. Wochenenden und Feiertage zählen nicht als Urlaubstage.
+        if ($data['aktion'] === 'urlaub') {
+            $werte = ['art' => 'urlaub', 'von' => $von->toDateString(), 'bis' => $bis->toDateString(), 'halbtag' => false,
+                'notiz' => ($data['notiz'] ?? null) ?: 'Im Dienstplan eingetragen'];
+            if ($fehler = AbwesenheitController::ueberschneidung($person, $werte)) {
+                return back()->with('error', $fehler);
+            }
+            $weg = 0;
+            DB::transaction(function () use ($werte, $person, $von, $bis, $abteilung, $request, &$weg) {
+                $a = Abwesenheit::create($werte + [
+                    'user_id' => $person->id,
+                    'status' => Abwesenheit::GENEHMIGT,
+                    'erfasst_von' => $request->user()->id,
+                    'entschieden_von' => $request->user()->id,
+                    'entschieden_am' => now(),
+                ]);
+                AbwesenheitController::auditEintrag($a);
+                FreierTag::where('user_id', $person->id)->whereDate('datum', '>=', $von->toDateString())
+                    ->whereDate('datum', '<=', $bis->toDateString())->delete();
+                $weg = Schicht::where('user_id', $person->id)
+                    ->whereDate('datum', '>=', $von->toDateString())->whereDate('datum', '<=', $bis->toDateString())
+                    ->whereHas('dienstplan', fn ($q) => $q->where('abteilung_id', $abteilung->id))
+                    ->delete();
+            });
+
+            return back()->with('status', "{$person->name} hat Urlaub: {$zeitraum}".($weg ? " – {$weg} Schicht".($weg > 1 ? 'en' : '').' entfernt' : '').'.');
         }
 
         $weg = 0;

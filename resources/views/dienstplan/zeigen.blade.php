@@ -319,6 +319,12 @@
                             <button type="button" @click="freiGeben(false)" class="rounded-lg border border-gray-300 bg-white px-2.5 py-1 text-gray-700 hover:bg-gray-100">Diesen Tag frei</button>
                             <button type="button" @click="freiGeben(true)" class="rounded-lg border border-gray-300 bg-white px-2.5 py-1 text-gray-700 hover:bg-gray-100">Diese Woche frei</button>
                         </div>
+                        <div x-show="user" class="flex flex-wrap items-center gap-2 rounded-lg bg-gray-50 px-3 py-2 text-sm">
+                            <span class="text-gray-600">Urlaub:</span>
+                            <button type="button" @click="freiGeben(false, true)" class="rounded-lg border border-gray-300 bg-white px-2.5 py-1 text-gray-700 hover:bg-gray-100">Diesen Tag Urlaub</button>
+                            <button type="button" @click="freiGeben(true, true)" class="rounded-lg border border-gray-300 bg-white px-2.5 py-1 text-gray-700 hover:bg-gray-100">Diese Woche Urlaub</button>
+                        </div>
+                        <p x-show="user" class="text-xs text-gray-400">Frei: Soll bleibt und verteilt sich auf die übrigen Tage. Urlaub: wird als genehmigter Urlaub eingetragen, die Stunden werden gutgeschrieben.</p>
                         <div class="flex items-center justify-between gap-2 pt-2">
                             <button type="button" x-show="vorhanden" @click="entfernen($el.form)"
                                     class="rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50">Entfernen</button>
@@ -436,12 +442,14 @@
                     freiEntfernen(datum) {
                         this.senden({ freiAktion: 'entfernen', freiVon: datum, freiBis: datum, freiWoche: false });
                     },
-                    async freiGeben(woche) {
+                    async freiGeben(woche, urlaub = false) {
                         const person = this.name || (this.$root.querySelector('select[name=user_id] option:checked')?.textContent ?? '');
-                        if (window.bestaetige && ! await window.bestaetige(
-                            `${person.trim()} hat ${woche ? 'in dieser Woche (Mo–So)' : 'an diesem Tag'} frei. Schichten dieser Abteilung in dem Zeitraum werden entfernt.`,
-                            { titel: woche ? 'Woche frei?' : 'Tag frei?', knopf: 'Frei geben' })) return;
-                        this.senden({ freiAktion: 'setzen', freiVon: this.datum, freiBis: '', freiWoche: woche, freiNotiz: '' });
+                        const wann = woche ? 'in dieser Woche (Mo–So)' : 'an diesem Tag';
+                        if (window.bestaetige && ! await window.bestaetige(urlaub
+                            ? `${person.trim()} hat ${wann} Urlaub – er wird als genehmigt eingetragen und zählt gegen den Urlaubsanspruch (Wochenenden und Feiertage nicht). Schichten dieser Abteilung in dem Zeitraum werden entfernt.`
+                            : `${person.trim()} hat ${wann} frei. Schichten dieser Abteilung in dem Zeitraum werden entfernt.`,
+                            { titel: urlaub ? (woche ? 'Woche Urlaub?' : 'Tag Urlaub?') : (woche ? 'Woche frei?' : 'Tag frei?'), knopf: urlaub ? 'Urlaub eintragen' : 'Frei geben' })) return;
+                        this.senden({ freiAktion: urlaub ? 'urlaub' : 'setzen', freiVon: this.datum, freiBis: '', freiWoche: woche, freiNotiz: '' });
                     },
                     oeffne(user, name, datum, tag, wochentag, von, bis, pause, notiz) {
                         Object.assign(this, { offen: true, alle: false, vorhanden: !! von, user, name, datum, tag, wochentag, von, bis, pause, notiz });
