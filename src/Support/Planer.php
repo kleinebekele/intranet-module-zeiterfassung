@@ -20,8 +20,8 @@ use Intranet\Modules\Zeiterfassung\Models\Zeitmodell;
  * „mindestens" und „gewünscht" (= mindestens + optional). Gesetzliche Feiertage
  * (Bundesland der Abteilung) sind geschlossen, Sondertage gehen vor.
  *
- * Soll: Tagessoll aus Zeitmodell bzw. Wochenstunden. Feiertage und Abwesenheiten
- * werden gutgeschrieben (Soll 0) – dem Mitarbeiter fehlt dadurch nichts.
+ * Soll: Tagessoll aus Zeitmodell bzw. Wochenstunden. Feiertage, geschlossene Sondertage
+ * und Abwesenheiten werden gutgeschrieben (Soll 0) – dem Mitarbeiter fehlt dadurch nichts.
  *
  * Vorschlag je Kalenderwoche in drei Schritten:
  *  1. Tage und Stunden der Stammkräfte: das Wochensoll auf so viele Tage, wie die
@@ -235,7 +235,10 @@ class Planer
                     $soll = $modellWoche > 0
                         ? (int) round((Zeitmodell::amTag($liste, $d) ?? $modell)->sollFuer($d->dayOfWeekIso) * $anteil)
                         : ($d->dayOfWeekIso <= $tageWoche ? intdiv($wochen, $tageWoche) : 0);
-                    if (Feiertage::name($d, $land)) {
+                    $sonder = $this->sondertage[$d->toDateString()] ?? null;
+                    // Geschlossene Sondertage (Heiligabend, Silvester, Betriebsferien) wie Feiertage:
+                    // Dort deckt Urlaub das Soll, im Plan fehlt nichts.
+                    if (Feiertage::name($d, $land) || $sonder?->geschlossen) {
                         $gutschrift += $soll;
                         $soll = 0;
                     } elseif (isset($abwesend[$d->toDateString()])) {
