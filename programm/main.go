@@ -90,6 +90,8 @@ type App struct {
 	tagesPunkte                      []*systray.MenuItem // Tagesübersicht unter der Statuszeile
 	vorlagePunkte                    []*systray.MenuItem
 
+	mGehenIn, mGehenAufheben *systray.MenuItem // „Gehen in …" (gehenplan.go)
+
 	mStatus, mKommen, mPause, mWeiter, mGehen, mOeffnen, mVerbindung, mAutostart, mBeenden *systray.MenuItem
 }
 
@@ -108,6 +110,7 @@ func (a *App) bereit() {
 	a.mPause = systray.AddMenuItem("Pause", "Pause beginnen")
 	a.mWeiter = systray.AddMenuItem("Pause beenden", "Weiter arbeiten")
 	a.mGehen = systray.AddMenuItem("Gehen", "Arbeitszeit beenden")
+	a.gehenMenueAnlegen()
 	a.vorlagenMenueAnlegen()
 	systray.AddSeparator()
 	a.mOeffnen = systray.AddMenuItem("Meine Zeiten im Intranet öffnen", "")
@@ -199,6 +202,14 @@ func (a *App) start() {
 	protokoll("Start, Version " + Version)
 
 	a.aktualisieren()
+	// Geplantes Gehen: verpasst (Rechner war aus) → jetzt nachtragen, sonst Wecker stellen.
+	if um := a.gehenGeplant(); !um.IsZero() {
+		if um.After(jetzt) {
+			a.gehenWecker(um)
+		} else if a.gehenPruefen(jetzt) {
+			beatOk = false // das Ende ist geklärt, nicht noch nach dem Ausschalten fragen
+		}
+	}
 	if a.nachUpdate {
 		// Nach dem Update nichts fragen – es war ja nur ein Neustart im laufenden Betrieb.
 		meldeUpdate()
@@ -339,6 +350,9 @@ func (a *App) takt(t time.Time) {
 	vorher := a.letzterTick
 	a.letzterTick = t
 	schreibeLebenszeichen(t)
+	if a.gehenPruefen(t) {
+		return
+	}
 
 	// Lücke im Takt = Ruhezustand. Noch gesperrt? Dann klärt das Entsperren; sonst gleich nachfragen.
 	if t.Sub(vorher) >= abwesendAbPause {
@@ -412,7 +426,7 @@ func (a *App) erinnern() {
 				a.hinweis("In etwa 15 Minuten erreichst du die Höchstarbeitszeit von " + dauer(maxTag) + " Std.")
 			})
 		default:
-			if grund := feierabendGrund(s, heuteMin, jetzt); grund != "" && a.faellig("feierabend") {
+			if grund := feierabendGrund(s, heuteMin, jetzt); grund != "" && a.gehenGeplant().IsZero() && a.faellig("feierabend") {
 				// Die Erinnerung kommt nach „Später" erneut – dann soll der aktuelle Stand drinstehen.
 				grund = "Du hast heute " + dauer(heuteMin) + " Std. gearbeitet.\n" + grund
 				go a.erinnerungFolge("feierabend", grund+"\n\nFeierabend? Gehen buchen?", "Gehen", 30*time.Minute, "gehen")
@@ -651,6 +665,7 @@ func (a *App) stempeln(aktion string, extra ...url.Values) {
 			a.erledige("start")
 		}
 		if aktion == "kommen" || aktion == "gehen" {
+			a.gehenPlanLoeschen()
 			a.merkerMu.Lock()
 			a.vorlageBis = time.Time{} // Kommen/Gehen setzt Teams ohnehin neu
 			a.merkerMu.Unlock()
@@ -727,8 +742,10 @@ func (a *App) menueSetzen() {
 	}
 	if s == nil {
 		a.tagesMenueSetzen(nil)
+		a.gehenMenueSetzen(false)
 		return
 	}
+	gehenMoeglich := false
 	for _, akt := range s.Aktionen {
 		switch akt {
 		case "kommen":
@@ -739,8 +756,10 @@ func (a *App) menueSetzen() {
 			a.mWeiter.Enable()
 		case "gehen":
 			a.mGehen.Enable()
+			gehenMoeglich = true
 		}
 	}
+	a.gehenMenueSetzen(gehenMoeglich)
 	seit := ""
 	if t, err := time.Parse(time.RFC3339, s.Seit); err == nil {
 		seit = " seit " + t.Local().Format("15:04")

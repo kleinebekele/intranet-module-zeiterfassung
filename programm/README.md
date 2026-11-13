@@ -16,6 +16,10 @@ sonst Tagessoll, sonst Ende der Kernzeit) und die Höchstarbeitszeit – gebucht
   Rechner über Nacht aus, ohne zu gehen: Am nächsten Morgen wird „Gehen“ zum Zeitpunkt des Ausschaltens eingetragen
   und das Programm meldet Uhrzeit und Tagessumme.
   Solange gesperrt, keine Erinnerungen. „Beenden“ über das Menü fragt nach „Gehen“.
+- **Gehen in …** (Rechtsklick): Gehen in 5/10/15/20/30/45/60 Min. vormerken (`gehen-geplant.txt`). Gebucht wird zur
+  gewählten Zeit, auch bei gesperrtem Rechner; war er da aus oder im Ruhezustand, wird Gehen zur geplanten Zeit
+  nachgetragen. Bis dahin steht „Gehen um … geplant“ im Menü (mit „aufheben“), die Feierabend-Erinnerung schweigt.
+  Kommen/Gehen von Hand hebt den Plan auf.
 - **Startfrage:** „Ja, Kommen …“ fragt nach dem Beginn – jetzt oder vor 1–15 Minuten (nie vor das letzte Gehen).
 - **Pause:** Fenster mit 15/30/45/60 Min. und – bei gekoppeltem Teams – Statusnachricht. Nach der gewählten Dauer
   fragt das Programm nur „Pause beenden?“; ohne Antwort bleibt es Pause (nichts wird automatisch gebucht).
