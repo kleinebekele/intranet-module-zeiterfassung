@@ -65,3 +65,30 @@ func TestFeierabendMitPflichtpause(t *testing.T) {
 		t.Errorf("5 Std. Soll ohne Pflichtpause: ab 15:00 Uhr, nicht %s", f)
 	}
 }
+
+// Woche: Vorsprung aus den Vortagen verkürzt den Tag, Rückstand zeigt eine zweite Zeile –
+// außer man käme dafür über 10 Std.
+func TestWochensoll(t *testing.T) {
+	jetzt := um("13:00")
+	a := &App{geholtAm: jetzt}
+	neu := func(saldo int) *Status {
+		s := &Status{Zustand: "da", HeuteMinuten: 240, BlockMinuten: 30, SollHeute: 480, WocheSaldo: saldo,
+			Abschnitte: []Zeitraum{{"08:00", "12:00"}, {"12:30", ""}}}
+		s.Regeln.MaxBlock, s.Regeln.MaxTag = 360, 600
+		return s
+	}
+	if f := a.feierabend(neu(60), jetzt); f != "ab 16:00 Uhr" {
+		t.Errorf("1 Std. Vorsprung: ab 16:00 Uhr, nicht %s", f)
+	}
+	if w := a.wochensoll(neu(60), jetzt); w != "" {
+		t.Errorf("Vorsprung: keine Wochenzeile, aber %s", w)
+	}
+	s := neu(-90)
+	if f, w := a.feierabend(s, jetzt), a.wochensoll(s, jetzt); f != "ab 17:00 Uhr" || w != "ab 18:45 Uhr" {
+		t.Errorf("1:30 Std. Rückstand: Feierabend ab 17:00, Woche ab 18:45 (9:30 Std. → 45 Min. Pause) – nicht %s / %s", f, w)
+	}
+	t.Log("\n" + a.tooltipText(s, jetzt))
+	if w := a.wochensoll(neu(-150), jetzt); w != "" {
+		t.Errorf("10:30 Std. nötig: weglassen, aber %s", w)
+	}
+}

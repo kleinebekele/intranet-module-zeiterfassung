@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf16"
 
 	"fyne.io/systray"
 )
@@ -72,8 +73,13 @@ func (a *App) tagesZeilen(s *Status, jetzt time.Time) (kopf string, abschnitte, 
 	}
 	if um := a.gehenGeplant(); !um.IsZero() && s.Zustand != "weg" {
 		fuss = append(fuss, "Gehen geplant um "+um.Format("15:04")+" Uhr")
-	} else if f := a.feierabend(s, jetzt); f != "" {
-		fuss = append(fuss, "Feierabend "+f)
+	} else {
+		if f := a.feierabend(s, jetzt); f != "" {
+			fuss = append(fuss, "Feierabend "+f)
+		}
+		if w := a.wochensoll(s, jetzt); w != "" {
+			fuss = append(fuss, "Wochensoll "+w)
+		}
 	}
 	return kopf, abschnitte, fuss
 }
@@ -87,8 +93,17 @@ func (a *App) tooltipText(s *Status, jetzt time.Time) string {
 	}
 	if um := a.gehenGeplant(); !um.IsZero() && s.Zustand != "weg" {
 		zeilen = append(zeilen, "Gehen geplant "+um.Format("15:04"))
-	} else if f := a.feierabend(s, jetzt); f != "" {
-		zeilen = append(zeilen, "Feierabend "+strings.TrimSuffix(f, " Uhr"))
+	} else {
+		if f := a.feierabend(s, jetzt); f != "" {
+			zeilen = append(zeilen, "Feierabend "+strings.TrimSuffix(f, " Uhr"))
+		}
+		// Wochensoll nur, wenn es noch in die 63 Zeichen passt – vollständig steht es im Menü.
+		if w := a.wochensoll(s, jetzt); w != "" {
+			mit := strings.Join(append(zeilen, "Wochensoll "+strings.TrimSuffix(w, " Uhr")), "\n")
+			if len(utf16.Encode([]rune(mit))) <= tooltipMax {
+				return mit
+			}
+		}
 	}
 	return kuerze(strings.Join(zeilen, "\n"), tooltipMax)
 }
@@ -162,32 +177,64 @@ func (a *App) naechstePause(s *Status, jetzt time.Time) string {
 }
 
 // Frühester Feierabend: Schichtende laut Dienstplan, sonst Tagessoll erreicht – samt den
-// Pflichtpausen, die bis dahin noch anfallen –, sonst Ende der Kernzeit.
+// Pflichtpausen, die bis dahin noch anfallen –, sonst Ende der Kernzeit. Ein Vorsprung aus den
+// Vortagen dieser Woche verkürzt das Tagessoll (früher Feierabend).
 func (a *App) feierabend(s *Status, jetzt time.Time) string {
-	heute := a.heuteBisher(s, jetzt)
 	switch {
 	case s.Schicht != nil:
 		return "ab " + s.Schicht.Bis + " Uhr"
-	case s.SollHeute > 0 && heute >= s.SollHeute:
-		return "– Soll erreicht"
-	case s.SollHeute > 0 && s.Zustand == "da":
-		rest := s.SollHeute - heute
-		block := s.BlockMinuten + int(jetzt.Sub(a.geholtAm).Minutes())
-		return "ab " + jetzt.Add(time.Duration(rest+nochPflichtpause(s, rest, block))*time.Minute).Format("15:04") + " Uhr"
 	case s.SollHeute > 0:
-		return "in " + dauer(s.SollHeute-heute) + " Std. Arbeit"
+		return a.bisZiel(s, jetzt, tagesZiel(s), "– Soll erreicht")
 	case s.Kern != nil:
 		return "ab " + s.Kern.Bis + " Uhr"
 	}
 	return ""
 }
 
+// Heutiges Ziel in Minuten: Tagessoll abzüglich Vorsprung aus den Vortagen der Woche.
+func tagesZiel(s *Status) int {
+	return max(s.SollHeute-max(s.WocheSaldo, 0), 0)
+}
+
+// Fehlt aus den Vortagen der Woche noch Zeit: wann sie heute aufgeholt ist. Leer, wenn nichts
+// fehlt, es schon aufgeholt ist oder man dafür über die Höchstarbeitszeit (10 Std.) käme –
+// dann wird der Rest vermutlich an einem anderen Tag (z. B. Samstag) gearbeitet.
+func (a *App) wochensoll(s *Status, jetzt time.Time) string {
+	if s.Schicht != nil || s.SollHeute <= 0 || s.WocheSaldo >= 0 {
+		return ""
+	}
+	ziel := s.SollHeute - s.WocheSaldo
+	maxTag := s.Regeln.MaxTag
+	if maxTag <= 0 {
+		maxTag = 600
+	}
+	if ziel > maxTag || a.heuteBisher(s, jetzt) >= ziel {
+		return ""
+	}
+	return a.bisZiel(s, jetzt, ziel, "")
+}
+
+// „ab 16:49 Uhr" (eingestempelt, samt noch fälliger Pflichtpausen) bzw. „in 2:10 Std. Arbeit".
+func (a *App) bisZiel(s *Status, jetzt time.Time, ziel int, erreicht string) string {
+	heute := a.heuteBisher(s, jetzt)
+	switch {
+	case heute >= ziel:
+		return erreicht
+	case s.Zustand == "da":
+		rest := ziel - heute
+		block := s.BlockMinuten + int(jetzt.Sub(a.geholtAm).Minutes())
+		return "ab " + jetzt.Add(time.Duration(rest+nochPflichtpause(s, ziel, rest, block))*time.Minute).Format("15:04") + " Uhr"
+	default:
+		return "in " + dauer(ziel-heute) + " Std. Arbeit"
+	}
+}
+
 // Pause in Minuten, die bis zum Erreichen des Solls noch Pflicht wird (§ 4 ArbZG): insgesamt
 // 30 Min. über 6 Std. und 45 Min. über 9 Std. Arbeit, jede Pause mindestens 15 Min., und
 // höchstens 6 Std. am Stück.
-func nochPflichtpause(s *Status, rest, block int) int {
+func nochPflichtpause(s *Status, ziel, rest, block int) int {
 	noetig := 0
-	switch soll := s.SollHeute; {
+	switch soll := ziel; {
 	case soll > 540:
 		noetig = 45
 	case soll > 360:

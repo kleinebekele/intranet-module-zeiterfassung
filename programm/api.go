@@ -25,6 +25,7 @@ type Status struct {
 	OffenSeitVortag bool       `json:"offen_seit_vortag"`
 	OffenBeginn     string     `json:"offen_beginn"`
 	SollHeute       int        `json:"soll_heute_minuten"`
+	WocheSaldo      int        `json:"woche_saldo_minuten"` // Mo bis gestern: + = Vorsprung, − = fehlt noch
 	Kern            *Zeitraum  `json:"kern"`
 	Schicht         *Zeitraum  `json:"schicht"`
 	Regeln          struct {

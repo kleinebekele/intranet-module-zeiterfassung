@@ -444,7 +444,10 @@ func feierabendGrund(s *Status, heuteMin int, jetzt time.Time) string {
 		}
 		return ""
 	}
-	if s.SollHeute > 0 && heuteMin >= s.SollHeute {
+	if s.SollHeute > 0 && heuteMin >= tagesZiel(s) {
+		if s.WocheSaldo > 0 && heuteMin < s.SollHeute {
+			return "Mit deinem Vorsprung von " + dauer(s.WocheSaldo) + " Std. aus dieser Woche ist dein Tagessoll erreicht."
+		}
 		return "Dein Tagessoll von " + dauer(s.SollHeute) + " Std. ist erreicht."
 	}
 	if s.Kern != nil && s.SollHeute == 0 {

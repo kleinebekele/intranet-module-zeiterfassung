@@ -14,6 +14,7 @@ use Intranet\Modules\Zeiterfassung\Models\Statusvorlage;
 use Intranet\Modules\Zeiterfassung\Models\Zeitmodell;
 use Intranet\Modules\Zeiterfassung\Support\Einstellungen;
 use Intranet\Modules\Zeiterfassung\Support\Korrektur;
+use Intranet\Modules\Zeiterfassung\Support\Rechner;
 use Intranet\Modules\Zeiterfassung\Support\Rechte;
 use Intranet\Modules\Zeiterfassung\Support\Stempeluhr;
 use Intranet\Modules\Zeiterfassung\Support\TeamsStatus;
@@ -56,6 +57,10 @@ class AppController
             'offen_seit_vortag' => $offen !== null && $offen->beginn->lt($jetzt->copy()->startOfDay()),
             'offen_beginn' => $offen?->beginn->toIso8601String(),
             'soll_heute_minuten' => $modell?->sollFuer($jetzt->dayOfWeekIso) ?? 0,
+            // Saldo der Vortage dieser Woche (Mo bis gestern): Vorsprung verkürzt den Feierabend,
+            // Rückstand zeigt das Programm als „Wochensoll ab …".
+            'woche_saldo_minuten' => $jetzt->isMonday() ? 0 : array_sum(array_map(fn ($t) => $t->saldo(),
+                (new Rechner($user, $jetzt->copy()->startOfWeek(), $jetzt->copy()->subDay(), $jetzt))->tage())),
             'kern' => $kern ? ['von' => sprintf('%02d:%02d', intdiv($kern[0], 60), $kern[0] % 60), 'bis' => sprintf('%02d:%02d', intdiv($kern[1], 60), $kern[1] % 60)] : null,
             'schicht' => $schicht ? ['von' => $schicht->von, 'bis' => $schicht->bis, 'pause' => (int) $schicht->pause] : null,
             'regeln' => [

@@ -26,6 +26,8 @@ sonst Tagessoll, sonst Ende der Kernzeit) und die Höchstarbeitszeit – gebucht
 - **Tagesübersicht** (Mouseover am Uhr-Symbol und vollständig im Rechtsklick-Menü): heutige Abschnitte mit Dauer,
   Pausen dazwischen (unter 15 Min. „zu kurz“), nächste fällige Pause (6 Std. am Stück, 30 Min. ab 6 Std., 45 Min. ab
   9 Std.) und Feierabend. Der Mouseover zeigt nur 63 Zeichen: Summe, nächste Pause, Feierabend.
+  Woche (Saldo Mo bis gestern): Ein Vorsprung verschiebt „Feierabend ab …“ nach vorn (auch die Erinnerung). Fehlt
+  noch Zeit, steht darunter „Wochensoll ab …“ – nicht, wenn man dafür über 10 Std. am Tag käme.
 - **Pausenpflicht (6 Std. am Stück):** Warnung 15 Min. vorher, erneut 5 Min. vorher; reagiert niemand, trägt das
   Programm die Pause an der Grenze selbst ein und meldet das (nur „OK“). Beendet wird sie nur per Klick.
 - **Immer nur ein Fenster:** Weitere Meldungen warten, bis das offene Fenster beantwortet ist; Menüpunkte melden
