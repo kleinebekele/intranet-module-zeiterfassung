@@ -76,7 +76,7 @@ func (a *App) autoPause(block int) {
 	}
 	jetzt := time.Now()
 	a.merkerMu.Lock()
-	a.pauseBis = jetzt.Add(30 * time.Minute)
+	a.pauseBis = merkePauseBis(jetzt.Add(30 * time.Minute))
 	delete(a.spaeter, "pause")
 	delete(a.spaeter, "weiter")
 	a.merkerMu.Unlock()

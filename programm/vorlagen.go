@@ -129,7 +129,7 @@ func (a *App) vorlageWaehlen(n int) {
 		a.merkerMu.Lock()
 		if res.Pause {
 			// Die Pausen-Erinnerung fragt nach der Dauer „Pause beenden?" – das setzt Teams mit zurück.
-			a.pauseBis = bis.Local()
+			a.pauseBis = merkePauseBis(bis.Local())
 			delete(a.spaeter, "weiter")
 		} else if res.Rueckfrage {
 			a.vorlageBis, a.vorlageName = bis.Local(), v.Name

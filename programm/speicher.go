@@ -87,3 +87,25 @@ func protokoll(text string) {
 	defer f.Close()
 	_, _ = f.WriteString(time.Now().Format("2006-01-02 15:04:05") + "  " + text + "\r\n")
 }
+
+// Geplantes Pausenende (Pausenfenster, Statusvorlage mit Pause, automatische Pause): liegt in
+// einer Datei, damit „Pause beenden?" nach einem Neustart (Update, Windows) nicht schon nach den
+// üblichen 30 Minuten fragt.
+func pauseBisDatei() string { return filepath.Join(datenOrdner(), "pause-bis.txt") }
+
+func merkePauseBis(t time.Time) time.Time {
+	_ = os.WriteFile(pauseBisDatei(), []byte(t.Format(time.RFC3339)), 0o600)
+	return t
+}
+
+func ladePauseBis() time.Time {
+	inhalt, err := os.ReadFile(pauseBisDatei())
+	if err != nil {
+		return time.Time{}
+	}
+	t, err := time.Parse(time.RFC3339, strings.TrimSpace(string(inhalt)))
+	if err != nil {
+		return time.Time{}
+	}
+	return t.Local()
+}

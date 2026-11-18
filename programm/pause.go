@@ -43,7 +43,7 @@ func (a *App) pauseStarten() {
 	a.ergebnis(meldung, err)
 	if err == nil {
 		a.merkerMu.Lock()
-		a.pauseBis = bis
+		a.pauseBis = merkePauseBis(bis)
 		delete(a.spaeter, "weiter")
 		delete(a.spaeter, "pause")
 		a.merkerMu.Unlock()

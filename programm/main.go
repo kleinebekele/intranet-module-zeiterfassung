@@ -196,6 +196,9 @@ func (a *App) start() {
 		beat, beatOk = seit, true
 	}
 	a.vergissAbwesend()
+	a.merkerMu.Lock()
+	a.pauseBis = ladePauseBis() // gilt nur, wenn es nach dem Beginn der laufenden Pause liegt
+	a.merkerMu.Unlock()
 	jetzt := time.Now()
 	schreibeLebenszeichen(jetzt)
 	a.letzterTick = jetzt
