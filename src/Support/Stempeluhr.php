@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Intranet\Modules\Zeiterfassung\Models\Buchung;
+use Intranet\Modules\Zeiterfassung\Models\Vormerkung;
 use RuntimeException;
 
 /**
@@ -123,6 +124,9 @@ class Stempeluhr
 
             return $offen;
         });
+
+        // Vormerkungen des PC-Programms (geplantes Gehen, Pausenende) erledigen sich mit.
+        Vormerkung::nachBuchung($user, $aktion);
 
         // Teams-Status mitziehen (nur bei Kopplung; Fehler bremsen die Buchung nicht).
         if (empty($teams['ohne'])) {

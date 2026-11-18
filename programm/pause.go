@@ -39,6 +39,7 @@ func (a *App) pauseStarten() {
 	if i == nil {
 		return
 	}
+	extra.Set("minuten", strconv.Itoa(minuten)) // Pausenende merkt sich das Intranet
 	meldung, err := i.Stempeln("pause", extra)
 	a.ergebnis(meldung, err)
 	if err == nil {

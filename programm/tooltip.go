@@ -71,7 +71,7 @@ func (a *App) tagesZeilen(s *Status, jetzt time.Time) (kopf string, abschnitte, 
 	if p := a.naechstePause(s, jetzt); p != "" {
 		fuss = append(fuss, "nächste Pause fällig "+p)
 	}
-	if um := a.gehenGeplant(); !um.IsZero() && s.Zustand != "weg" {
+	if um := gehenGeplantIn(s); !um.IsZero() && s.Zustand != "weg" {
 		fuss = append(fuss, "Gehen geplant um "+um.Format("15:04")+" Uhr")
 	} else {
 		if f := a.feierabend(s, jetzt); f != "" {
@@ -91,7 +91,7 @@ func (a *App) tooltipText(s *Status, jetzt time.Time) string {
 	if p := a.naechstePause(s, jetzt); p != "" {
 		zeilen = append(zeilen, "Pause fällig "+strings.TrimSuffix(p, " Uhr"))
 	}
-	if um := a.gehenGeplant(); !um.IsZero() && s.Zustand != "weg" {
+	if um := gehenGeplantIn(s); !um.IsZero() && s.Zustand != "weg" {
 		zeilen = append(zeilen, "Gehen geplant "+um.Format("15:04"))
 	} else {
 		if f := a.feierabend(s, jetzt); f != "" {

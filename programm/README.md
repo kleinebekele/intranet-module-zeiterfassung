@@ -16,13 +16,15 @@ sonst Tagessoll, sonst Ende der Kernzeit) und die Höchstarbeitszeit – gebucht
   Rechner über Nacht aus, ohne zu gehen: Am nächsten Morgen wird „Gehen“ zum Zeitpunkt des Ausschaltens eingetragen
   und das Programm meldet Uhrzeit und Tagessumme.
   Solange gesperrt, keine Erinnerungen. „Beenden“ über das Menü fragt nach „Gehen“.
-- **Gehen in …** (Rechtsklick): Gehen in 5/10/15/20/30/45/60 Min. vormerken (`gehen-geplant.txt`). Gebucht wird zur
-  gewählten Zeit, auch bei gesperrtem Rechner; war er da aus oder im Ruhezustand, wird Gehen zur geplanten Zeit
-  nachgetragen. Bis dahin steht „Gehen um … geplant“ im Menü (mit „aufheben“), die Feierabend-Erinnerung schweigt.
-  Kommen/Gehen von Hand hebt den Plan auf.
+- **Gehen in …** (Rechtsklick): Gehen in 5/10/15/20/30/45/60 Min. vormerken – der Plan liegt im Intranet, gebucht wird
+  dort zur gewählten Zeit, auch wenn der Rechner dann gesperrt oder aus ist (später entdeckt: zur geplanten Zeit
+  nachgetragen). Bis dahin steht „Gehen um … geplant“ im Menü (mit „aufheben“, auch unter „Meine Zeiten“), die
+  Feierabend-Erinnerung schweigt. Kommen/Gehen von Hand hebt den Plan auf.
 - **Startfrage:** „Ja, Kommen …“ fragt nach dem Beginn – jetzt oder vor 1–15 Minuten (nie vor das letzte Gehen).
 - **Pause:** Fenster mit 15/30/45/60 Min. und – bei gekoppeltem Teams – Statusnachricht. Nach der gewählten Dauer
   fragt das Programm nur „Pause beenden?“; ohne Antwort bleibt es Pause (nichts wird automatisch gebucht).
+  Das Pausenende (auch aus Statusvorlagen) und der Ablauf einer Statusvorlage mit Rückfrage liegen im Intranet und
+  überstehen Neustarts und Gerätewechsel; `pause-bis.txt` ist nur der Zwischenspeicher ohne Netz.
 - **Tagesübersicht** (Mouseover am Uhr-Symbol und vollständig im Rechtsklick-Menü): heutige Abschnitte mit Dauer,
   Pausen dazwischen (unter 15 Min. „zu kurz“), nächste fällige Pause (6 Std. am Stück, 30 Min. ab 6 Std., 45 Min. ab
   9 Std.) und Feierabend. Der Mouseover zeigt nur 63 Zeichen: Summe, nächste Pause, Feierabend.

@@ -18,6 +18,8 @@
                     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 {{ $mitTeams ? '' : 'xl:grid-cols-3' }}">
                         @include('zeiterfassung::partials.stempeluhr', [
                             'status' => $status,
+                            'vormerkung' => $vormerkung,
+                            'aufhebenRoute' => route('module.zeiterfassung.meine.gehen.aufheben'),
                             'route' => route('module.zeiterfassung.meine.stempeln'),
                             'darfStempeln' => $webStempeln,
                             'kacheln' => true,

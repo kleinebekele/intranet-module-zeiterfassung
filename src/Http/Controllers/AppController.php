@@ -11,6 +11,7 @@ use Intranet\Modules\Zeiterfassung\Models\Buchung;
 use Intranet\Modules\Zeiterfassung\Models\Dienstplan;
 use Intranet\Modules\Zeiterfassung\Models\Schicht;
 use Intranet\Modules\Zeiterfassung\Models\Statusvorlage;
+use Intranet\Modules\Zeiterfassung\Models\Vormerkung;
 use Intranet\Modules\Zeiterfassung\Models\Zeitmodell;
 use Intranet\Modules\Zeiterfassung\Support\Einstellungen;
 use Intranet\Modules\Zeiterfassung\Support\Korrektur;
@@ -31,6 +32,8 @@ class AppController
     {
         $user = $request->user();
         $jetzt = now();
+        // Fälliges geplantes Gehen gleich hier buchen (sonst spätestens der Minuten-Task).
+        $gebucht = Vormerkung::gehenBuchen($user, $jetzt);
         $status = Stempeluhr::status($user, $jetzt);
         $offen = Stempeluhr::offen($user);
 
@@ -74,6 +77,9 @@ class AppController
             'vorlagen' => TeamsStatus::gekoppelt($user)
                 ? Statusvorlage::where('user_id', $user->id)->orderBy('position')->orderBy('name')->get()->map->fuerApp()->values()
                 : [],
+            // Geplantes Pausenende, geplantes Gehen, Statusvorlage mit Rückfrage – übersteht Neustarts.
+            'vormerkung' => Vormerkung::fuerApp($user, $status['zustand'], $status['seit']),
+            'gehen_gebucht' => $gebucht,
             'server_zeit' => $jetzt->toIso8601String(),
         ]);
     }
@@ -150,10 +156,16 @@ class AppController
         }
 
         $bis = now()->addMinutes($vorlage->minuten);
+        if ($vorlage->pause) {
+            Vormerkung::setzen($user, ['pause_bis' => $bis]); // „Pause beenden?" erst danach
+        }
         try {
             TeamsStatus::vorlageAnwenden($user, $vorlage);
         } catch (RuntimeException $e) {
             return response()->json(['ok' => false, 'meldung' => ($vorlage->pause ? 'Pause gebucht, aber ' : '').$e->getMessage()], 502);
+        }
+        if (! $vorlage->pause && $vorlage->rueckkehr !== 'automatisch') {
+            Vormerkung::setzen($user, ['vorlage_bis' => $bis, 'vorlage_name' => mb_substr($vorlage->name, 0, 100)]);
         }
 
         return response()->json([
@@ -200,11 +212,37 @@ class AppController
     {
         try {
             TeamsStatus::zuruecksetzen($request->user());
+            Vormerkung::setzen($request->user(), ['vorlage_bis' => null, 'vorlage_name' => null]);
         } catch (RuntimeException $e) {
             return response()->json(['ok' => false, 'meldung' => $e->getMessage()], 502);
         }
 
         return response()->json(['ok' => true, 'meldung' => 'Teams ist wieder verfügbar.']);
+    }
+
+    /**
+     * „Gehen in …": Gehen in 5–60 Minuten vormerken, minuten = 0 hebt den Plan auf. Gebucht
+     * wird auf dem Server (Minuten-Task bzw. nächster Status-Abruf) – auch bei ausgeschaltetem PC.
+     */
+    public function gehenPlanen(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $minuten = (int) $request->input('minuten');
+        if ($minuten === 0) {
+            Vormerkung::setzen($user, ['gehen_um' => null]);
+
+            return response()->json(['ok' => true, 'meldung' => 'Geplantes Gehen aufgehoben.']);
+        }
+        if ($minuten < 1 || $minuten > 240) {
+            return response()->json(['ok' => false, 'meldung' => 'Ungültige Dauer.'], 422);
+        }
+        if (Stempeluhr::status($user)['zustand'] === 'weg') {
+            return response()->json(['ok' => false, 'meldung' => 'Du bist nicht eingestempelt.'], 409);
+        }
+        $um = now()->addMinutes($minuten)->startOfMinute();
+        Vormerkung::setzen($user, ['gehen_um' => $um]);
+
+        return response()->json(['ok' => true, 'meldung' => 'Gehen wird um '.$um->format('H:i').' Uhr gebucht.', 'um' => $um->toIso8601String()]);
     }
 
     /** Das Programm selbst – für das automatische Update. */
@@ -234,6 +272,11 @@ class AppController
             $buchung = Stempeluhr::buchen($request->user(), $aktion, 'app', null, $teams, $vor);
         } catch (RuntimeException $e) {
             return response()->json(['ok' => false, 'meldung' => $e->getMessage()], 409);
+        }
+        // Pause mit geplanter Dauer (Pausenfenster, automatische Pause): „Pause beenden?" erst danach.
+        $dauer = (int) $request->input('minuten');
+        if ($aktion === 'pause' && $dauer > 0) {
+            Vormerkung::setzen($request->user(), ['pause_bis' => now()->addMinutes(min($dauer, 600))]);
         }
         $zeit = $aktion === 'kommen' ? $buchung->beginn : now();
 
@@ -275,6 +318,7 @@ class AppController
             return response()->json(['ok' => false, 'meldung' => $e->getMessage()], 409);
         }
         TeamsStatus::nachBuchung($user, 'gehen');
+        Vormerkung::nachBuchung($user, 'gehen');
 
         // Arbeitszeit des Tages, an dem der Abschnitt endete (für die Info am nächsten Morgen).
         $tagMinuten = Buchung::gueltig()->where('user_id', $user->id)->zwischen($ende, $ende)->get()

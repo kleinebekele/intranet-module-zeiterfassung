@@ -98,6 +98,19 @@ func merkePauseBis(t time.Time) time.Time {
 	return t
 }
 
+// Vormerkungen aus dem Intranet übernehmen: Sie gelten vor dem lokalen Stand (anderes Gerät,
+// Neustart). Fehlt ein Pausenende dort (Intranet noch ohne Vormerkungen), bleibt das lokale.
+func (a *App) vormerkungUebernehmen(s *Status) {
+	a.merkerMu.Lock()
+	defer a.merkerMu.Unlock()
+	if t, err := time.Parse(time.RFC3339, s.Vormerkung.PauseBis); err == nil && !t.Local().Equal(a.pauseBis) {
+		a.pauseBis = merkePauseBis(t.Local())
+	}
+	if t, err := time.Parse(time.RFC3339, s.Vormerkung.VorlageBis); err == nil {
+		a.vorlageBis, a.vorlageName = t.Local(), s.Vormerkung.VorlageName
+	}
+}
+
 func ladePauseBis() time.Time {
 	inhalt, err := os.ReadFile(pauseBisDatei())
 	if err != nil {

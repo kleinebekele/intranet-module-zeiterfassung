@@ -205,13 +205,9 @@ func (a *App) start() {
 	protokoll("Start, Version " + Version)
 
 	a.aktualisieren()
-	// Geplantes Gehen: verpasst (Rechner war aus) → jetzt nachtragen, sonst Wecker stellen.
-	if um := a.gehenGeplant(); !um.IsZero() {
-		if um.After(jetzt) {
-			a.gehenWecker(um)
-		} else if a.gehenPruefen(jetzt) {
-			beatOk = false // das Ende ist geklärt, nicht noch nach dem Ausschalten fragen
-		}
+	// Geplantes Gehen: Das Intranet bucht es (auch bei ausgeschaltetem Rechner) – Wecker nur für Pünktlichkeit.
+	if um := a.gehenGeplant(); um.After(jetzt) {
+		a.gehenWecker(um)
 	}
 	if a.nachUpdate {
 		// Nach dem Update nichts fragen – es war ja nur ein Neustart im laufenden Betrieb.
@@ -429,7 +425,7 @@ func (a *App) erinnern() {
 				a.hinweis("In etwa 15 Minuten erreichst du die Höchstarbeitszeit von " + dauer(maxTag) + " Std.")
 			})
 		default:
-			if grund := feierabendGrund(s, heuteMin, jetzt); grund != "" && a.gehenGeplant().IsZero() && a.faellig("feierabend") {
+			if grund := feierabendGrund(s, heuteMin, jetzt); grund != "" && gehenGeplantIn(s).IsZero() && a.faellig("feierabend") {
 				// Die Erinnerung kommt nach „Später" erneut – dann soll der aktuelle Stand drinstehen.
 				grund = "Du hast heute " + dauer(heuteMin) + " Std. gearbeitet.\n" + grund
 				go a.erinnerungFolge("feierabend", grund+"\n\nFeierabend? Gehen buchen?", "Gehen", 30*time.Minute, "gehen")
@@ -671,7 +667,7 @@ func (a *App) stempeln(aktion string, extra ...url.Values) {
 			a.erledige("start")
 		}
 		if aktion == "kommen" || aktion == "gehen" {
-			a.gehenPlanLoeschen()
+			// Den geplanten Gehen-Termin hebt das Intranet selbst auf.
 			a.merkerMu.Lock()
 			a.vorlageBis = time.Time{} // Kommen/Gehen setzt Teams ohnehin neu
 			a.merkerMu.Unlock()
@@ -711,6 +707,16 @@ func (a *App) aktualisieren() {
 	s, err := i.Status()
 	a.mu.Lock()
 	if err == nil {
+		// Geplantes Gehen wurde gebucht – von diesem Abruf oder vom Intranet-Task (Plan fällig, jetzt weg).
+		if vorher := gehenGeplantIn(a.status); s.GehenGebucht != "" ||
+			(!vorher.IsZero() && !time.Now().Before(vorher) && s.Zustand == "weg" && s.Vormerkung.GehenUm == "") {
+			meldung := s.GehenGebucht
+			if meldung == "" {
+				meldung = "Geplantes Gehen um " + vorher.Format("15:04") + " Uhr gebucht."
+			}
+			defer func() { go a.gehenGebucht(meldung) }()
+		}
+		defer a.vormerkungUebernehmen(s)
 		a.status = s
 		a.geholtAm = time.Now()
 		defer a.updatePruefen(s)

@@ -36,6 +36,14 @@ type Status struct {
 	Programm *ProgrammInfo `json:"programm"`
 	Teams    *TeamsInfo    `json:"teams"` // nur bei Kopplung
 	Vorlagen []Vorlage     `json:"vorlagen"`
+	// Vormerkungen im Intranet – überstehen Neustarts und gelten auf allen Geräten.
+	Vormerkung struct {
+		PauseBis    string `json:"pause_bis"`    // geplantes Pausenende (nur während der Pause)
+		GehenUm     string `json:"gehen_um"`     // „Gehen in …" (bucht das Intranet)
+		VorlageBis  string `json:"vorlage_bis"`  // Statusvorlage mit Rückfrage läuft bis …
+		VorlageName string `json:"vorlage_name"` //
+	} `json:"vormerkung"`
+	GehenGebucht string `json:"gehen_gebucht"` // dieser Abruf hat das geplante Gehen gebucht
 }
 
 type TeamsInfo struct {

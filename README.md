@@ -54,11 +54,18 @@ Voraussetzung: Rolle `zeit-homeoffice` (Stempeln im Intranet) bzw. Verwaltung. S
 
 | Aufruf | Zweck |
 |---|---|
-| `GET zeit-app/v1/status` | Zustand, heutige Arbeitszeit, Soll, Kernzeit, Schicht laut Dienstplan, Regeln |
-| `POST zeit-app/v1/stempeln` | `aktion` = kommen, pause, weiter, gehen |
+| `GET zeit-app/v1/status` | Zustand, heutige Arbeitszeit, Soll, Kernzeit, Schicht laut Dienstplan, Regeln, `vormerkung` (s. u.); bucht fälliges geplantes Gehen (`gehen_gebucht`) |
+| `POST zeit-app/v1/stempeln` | `aktion` = kommen, pause, weiter, gehen; bei pause optional `minuten` (geplantes Pausenende) |
+| `POST zeit-app/v1/gehen-planen` | `minuten` (1–240) = „Gehen in …“, `0` = aufheben |
 | `POST zeit-app/v1/gehen-nachtragen` | `zeit` (ISO 8601), `laut_geraet` (0/1), optional `notiz` |
 | `POST zeit-app/v1/pause-nachtragen` | `von`, `bis` (ISO 8601) – Abschnitt endet am Pausenbeginn, neuer beginnt am Ende |
 | `GET zeit-app/v1/programm` | die aktuelle `Zeiterfassung.exe` (automatisches Update; Version + SHA-256 stehen im Status) |
+
+**Vormerkungen** (`zeit_vormerkungen`, eine Zeile je Person): geplantes Pausenende, geplantes Gehen und Ablauf einer
+Statusvorlage mit Rückfrage liegen auf dem Server – sie überstehen Neustarts des Programms und gelten auf allen Geräten.
+Geplantes Gehen bucht der Server: beim Status-Abruf oder spätestens per Task `Zeiterfassung/GeplantesGehen` (jede
+Minute), auch bei ausgeschaltetem PC; mehr als 2 Min. verspätet wird es zur geplanten Zeit nachgetragen. Kommen/Gehen
+leert alle Vormerkungen, „Pause beenden“ das Pausenende. „Meine Zeiten“ zeigt sie in der Statuskachel (Gehen mit „aufheben“).
 
 ## Teams-Status (nur mit Microsoft-Anmeldung)
 

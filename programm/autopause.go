@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/url"
 	"time"
 
 	"github.com/ncruces/zenity"
@@ -68,7 +69,7 @@ func (a *App) autoPause(block int) {
 	if i == nil {
 		return
 	}
-	_, err := i.Stempeln("pause")
+	_, err := i.Stempeln("pause", url.Values{"minuten": {"30"}})
 	if err != nil {
 		protokoll("Automatische Pause: " + err.Error())
 		a.aktualisieren()

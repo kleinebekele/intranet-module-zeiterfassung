@@ -23,6 +23,7 @@ Route::middleware(['web', 'auth'])
         // Meine Zeiten: stempeln (Homeoffice), Monatsübersicht, Nachträge.
         Route::get('meine', [MeineZeitenController::class, 'index'])->name('meine.index');
         Route::post('meine/stempeln', [MeineZeitenController::class, 'stempeln'])->name('meine.stempeln');
+        Route::post('meine/gehen-aufheben', [MeineZeitenController::class, 'gehenAufheben'])->name('meine.gehen.aufheben');
         Route::post('meine/buchung', [MeineZeitenController::class, 'buchung'])->name('meine.buchung');
         Route::post('meine/loeschen', [MeineZeitenController::class, 'loeschen'])->name('meine.loeschen');
         Route::post('meine/code', [MeineZeitenController::class, 'code'])->name('meine.code');
@@ -118,6 +119,7 @@ Route::middleware([GeraetZugang::class, 'throttle:120,1'])
         Route::get('programm', [AppController::class, 'programm'])->name('programm');
         Route::post('stempeln', [AppController::class, 'stempeln'])->name('stempeln');
         Route::post('gehen-nachtragen', [AppController::class, 'gehenNachtragen'])->name('gehen');
+        Route::post('gehen-planen', [AppController::class, 'gehenPlanen'])->name('gehen.planen');
         Route::post('pause-nachtragen', [AppController::class, 'pauseNachtragen'])->name('pause');
         Route::post('vorlage', [AppController::class, 'vorlage'])->name('vorlage');
         Route::post('vorlage-anlegen', [AppController::class, 'vorlageAnlegen'])->name('vorlage.anlegen');

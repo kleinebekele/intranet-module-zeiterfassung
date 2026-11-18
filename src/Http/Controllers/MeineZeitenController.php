@@ -7,6 +7,7 @@ use Intranet\Modules\Zeiterfassung\Models\Ausweis;
 use Intranet\Modules\Zeiterfassung\Models\Geraet;
 use Intranet\Modules\Zeiterfassung\Models\Statusvorlage;
 use Intranet\Modules\Zeiterfassung\Models\Verstoss;
+use Intranet\Modules\Zeiterfassung\Models\Vormerkung;
 use Intranet\Modules\Zeiterfassung\Support\Einstellungen;
 use Intranet\Modules\Zeiterfassung\Support\Korrektur;
 use Intranet\Modules\Zeiterfassung\Support\Rechte;
@@ -27,6 +28,7 @@ class MeineZeitenController
         return view('zeiterfassung::meine.index', $this->monatsdaten($user, $monat) + [
             'teilnehmer' => Rechte::istTeilnehmer($user),
             'status' => Stempeluhr::status($user),
+            'vormerkung' => Vormerkung::von($user),
             'webStempeln' => Rechte::darfWebStempeln($user),
             'nachtrag' => Rechte::nachtragModus($user),
             'verstoesse' => Verstoss::where('user_id', $user->id)->where('datum', '>=', now()->subDays(30))->orderByDesc('datum')->get(),
@@ -166,6 +168,14 @@ class MeineZeitenController
         Korrektur::audit('zeiterfassung.ausweis', "PC-Programm getrennt ({$geraet->name})", $user);
 
         return back()->with('status', "Gerät „{$geraet->name}“ getrennt – das Programm dort kann nicht mehr stempeln.");
+    }
+
+    /** Im PC-Programm geplantes Gehen aufheben. */
+    public function gehenAufheben(Request $request)
+    {
+        Vormerkung::setzen($request->user(), ['gehen_um' => null]);
+
+        return back()->with('status', 'Geplantes Gehen aufgehoben.');
     }
 
     public function stempeln(Request $request)

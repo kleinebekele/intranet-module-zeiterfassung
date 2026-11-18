@@ -1,5 +1,6 @@
 {{-- Statuskarte mit Kommen/Pause/Gehen. Erwartet: $status, $route (Formularziel), $darfStempeln;
-     optional $kacheln = true: zwei einzelne Kacheln (Status | Knöpfe) für ein umgebendes Raster. --}}
+     optional $kacheln = true: zwei einzelne Kacheln (Status | Knöpfe) für ein umgebendes Raster;
+     optional $vormerkung (aus dem PC-Programm) und $aufhebenRoute (geplantes Gehen aufheben). --}}
 @php
     $farbe = ['da' => 'bg-green-500', 'pause' => 'bg-amber-400', 'weg' => 'bg-gray-300'][$status['zustand']];
     $text = ['da' => 'Anwesend', 'pause' => 'In der Pause', 'weg' => 'Nicht eingestempelt'][$status['zustand']];
@@ -21,6 +22,21 @@
                 @endif
             </div>
             <div class="text-sm text-gray-500">Heute gearbeitet: <strong class="text-gray-800">{{ \Intranet\Modules\Zeiterfassung\Support\Format::dauer($status['heute']) }} Std.</strong></div>
+            @php $vm = $vormerkung ?? null; @endphp
+            @if ($vm?->gehen_um && $status['zustand'] !== 'weg')
+                <div class="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-600">
+                    Gehen geplant um <strong class="text-gray-800">{{ $vm->gehen_um->format('H:i') }} Uhr</strong> (PC-Programm)
+                    @if (! empty($aufhebenRoute))
+                        <form method="POST" action="{{ $aufhebenRoute }}">
+                            @csrf
+                            <button type="submit" class="text-xs text-blue-600 hover:underline">aufheben</button>
+                        </form>
+                    @endif
+                </div>
+            @endif
+            @if ($vm?->pause_bis && $status['zustand'] === 'pause' && $status['seit'] && $vm->pause_bis->gt($status['seit']))
+                <div class="mt-1 text-sm text-gray-600">Pause geplant bis <strong class="text-gray-800">{{ $vm->pause_bis->format('H:i') }} Uhr</strong></div>
+            @endif
             @if ($status['zustand'] === 'da' && $status['block'] >= $maxBlock - 15)
                 <div class="mt-1 text-sm font-medium text-red-700">⚠ Seit {{ \Intranet\Modules\Zeiterfassung\Support\Format::dauer($status['block']) }} Std. ohne Pause – bitte Pause machen (§ 4 ArbZG).</div>
             @endif
